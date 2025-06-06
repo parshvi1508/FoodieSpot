@@ -6,6 +6,8 @@ from pydantic import BaseModel, field_validator, ValidationError, EmailStr
 from datetime import datetime, date
 import os
 from dotenv import load_dotenv
+# Add to app.py
+from recommendation_engine import recommendation_engine
 
 # Configure logging
 logging.basicConfig(
@@ -304,6 +306,50 @@ def create_reservation():
         }), 500
 
 # Get recommendations
+
+@app.route('/api/recommendations/smart', methods=['POST'])
+def get_smart_recommendations():
+    """Get intelligent recommendations based on session preferences"""
+    try:
+        preferences = request.get_json() or {}
+        
+        # Extract session preferences
+        session_prefs = {
+            'cuisine': preferences.get('cuisine'),
+            'city': preferences.get('city'),
+            'budget': preferences.get('budget'),
+            'price_range': preferences.get('price_range'),
+            'min_rating': preferences.get('min_rating', 4.0),
+            'date': preferences.get('date'),
+            'time': preferences.get('time'),
+            'party_size': preferences.get('party_size', 2)
+        }
+        
+        # Remove None values
+        session_prefs = {k: v for k, v in session_prefs.items() if v is not None}
+        
+        # Get recommendations
+        result = recommendation_engine.get_recommendations(session_prefs, limit=10)
+        
+        return jsonify({
+            'success': True,
+            'data': result['recommendations'],
+            'meta': {
+                'fallback_used': result['fallback_used'],
+                'available_count': result.get('available_count', 0),
+                'total_count': result.get('total_count', 0),
+                'response_time': result['response_time'],
+                'message': result['message']
+            }
+        })
+    
+    except Exception as e:
+        logger.error(f"Error in smart recommendations: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to generate recommendations'
+        }), 500
+
 @app.route('/api/recommendations', methods=['GET'])
 def get_recommendations():
     logger.info(f"GET /api/recommendations called with args: {request.args}")
