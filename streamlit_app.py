@@ -705,7 +705,26 @@ def get_restaurants_from_api():
         return []
     return st.session_state['cached_restaurants']
 
-# Add smart recommendations function
+# Enhanced smart recommendations function
+def get_smart_recommendations_for_ui(session_preferences):
+    """Get smart recommendations for Streamlit UI"""
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/recommendations/smart",
+            json=session_preferences,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('success'):
+                return result['data'], result['meta']
+        return [], {"message": "No recommendations available"}
+    except Exception as e:
+        st.error(f"Error getting recommendations: {e}")
+        return [], {"message": "Service unavailable"}
+
+# Add smart recommendations function (backward compatibility)
 def get_smart_recommendations(preferences):
     """Get smart recommendations from the recommendation engine"""
     try:
@@ -722,41 +741,20 @@ def get_smart_recommendations(preferences):
         st.error(f"Error getting recommendations: {e}")
         return None
 
-# Update the handle_recommendation_request function
-def handle_recommendation_request(user_input):
-    """Enhanced recommendation handling"""
-    # Extract preferences from session state or user input
-    preferences = {
-        'cuisine': st.session_state.get('last_cuisine_search'),
-        'city': st.session_state.get('last_city_search'),
-        'budget': 'moderate',  # Default
-        'min_rating': 4.0,
-        'party_size': 2
-    }
-    
-    result = get_smart_recommendations(preferences)
-    
-    if result and result.get('success'):
-        restaurants = result['data']
-        meta = result['meta']
-        
-        st.session_state.restaurants = restaurants[:5]
-        
-        response_msg = f"{meta['message']} "
-        if meta['response_time'] < 1.0:
-            response_msg += f"(Found in {meta['response_time']:.3f}s)"
-        
-        return response_msg
-    else:
-        return "I'm having trouble generating recommendations right now. Please try again or browse our restaurant collection."
-
+# Enhanced AI agent processing
 def process_user_input(user_input: str):
-    # First check for AI agent response
-    ai_response = ai_agent.chat(user_input)
-    if ai_response and ai_response.strip():
-        return ai_response
-    
-    # Fallback to rule-based responses
+    """Enhanced AI agent processing"""
+    try:
+        # Use the AI agent instead of simple keyword matching
+        response = ai_agent.chat(user_input)
+        return response
+    except Exception as e:
+        logger.error(f"AI agent error: {e}")
+        # Fallback to simple processing
+        return handle_fallback_response(user_input)
+
+def handle_fallback_response(user_input):
+    """Fallback response handler when AI agent fails"""
     user_input_lower = user_input.lower()
     
     if any(word in user_input_lower for word in ['find', 'search', 'restaurant', 'food', 'cuisine']):
@@ -767,6 +765,25 @@ def process_user_input(user_input: str):
         return handle_recommendation_request(user_input)
     else:
         return "I'm here to enhance your dining journey! I can help you discover exceptional restaurants, make seamless reservations, or provide personalized recommendations based on your preferences. What culinary adventure shall we plan today?"
+
+# Updated recommendation request handler
+def handle_recommendation_request(user_input):
+    """Use smart recommendation engine"""
+    preferences = {
+        'cuisine': st.session_state.get('last_cuisine_search'),
+        'city': st.session_state.get('last_city_search'),
+        'budget': 'moderate',
+        'min_rating': 4.0,
+        'party_size': 2
+    }
+    
+    restaurants, meta = get_smart_recommendations_for_ui(preferences)
+    
+    if restaurants:
+        st.session_state.restaurants = restaurants[:5]
+        return f"{meta['message']} (Response time: {meta.get('response_time', 0):.3f}s)"
+    else:
+        return "I'm having trouble generating recommendations right now. Please try browsing our restaurant collection."
 
 def handle_restaurant_search(user_input):
     cuisines = ['italian', 'mexican', 'chinese', 'japanese', 'french', 'indian', 'thai', 'american']
@@ -1078,10 +1095,10 @@ elif st.session_state.current_page == "Discover":
                     'party_size': 2
                 }
                 
-                result = get_smart_recommendations(preferences)
-                if result and result.get('success'):
-                    st.session_state.restaurants = result['data']
-                    st.success(f"Found {len(result['data'])} personalized recommendations!")
+                restaurants, meta = get_smart_recommendations_for_ui(preferences)
+                if restaurants:
+                    st.session_state.restaurants = restaurants
+                    st.success(f"Found {len(restaurants)} personalized recommendations!")
                     st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
