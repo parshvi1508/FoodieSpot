@@ -14,8 +14,6 @@ services:
         sync: false
       - key: TOGETHER_API_KEY
         sync: false
-      - key: FLASK_ENV
-        value: production
 
   # Streamlit Frontend
   - type: web
@@ -26,7 +24,4 @@ services:
     plan: free
     envVars:
       - key: API_BASE_URL
-        fromService:
-          type: web
-          name: foodiespot-api
-          property: host
+        value: https://foodiespot-api.onrender.com/api
