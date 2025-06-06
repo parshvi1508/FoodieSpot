@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "together-ai": "^0.16.0",
+    "weaviate-ts-client": "^2.2.0"
+  }
+}
