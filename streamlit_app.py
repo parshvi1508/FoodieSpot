@@ -645,7 +645,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# [Rest of the Python code remains the same as the previous version]
 # Fixed session state initialization
 def initialize_session_state():
     """Initialize session state with proper error handling"""
@@ -656,7 +655,9 @@ def initialize_session_state():
         'current_page': "Home",
         'search_filters': {},
         'booking_data': {},
-        'last_api_call': None
+        'last_api_call': None,
+        'last_cuisine_search': None,
+        'last_city_search': None
     }
     
     for key, default_value in default_states.items():
@@ -704,8 +705,58 @@ def get_restaurants_from_api():
         return []
     return st.session_state['cached_restaurants']
 
+# Add smart recommendations function
+def get_smart_recommendations(preferences):
+    """Get smart recommendations from the recommendation engine"""
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/recommendations/smart",
+            json=preferences,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception as e:
+        st.error(f"Error getting recommendations: {e}")
+        return None
+
+# Update the handle_recommendation_request function
+def handle_recommendation_request(user_input):
+    """Enhanced recommendation handling"""
+    # Extract preferences from session state or user input
+    preferences = {
+        'cuisine': st.session_state.get('last_cuisine_search'),
+        'city': st.session_state.get('last_city_search'),
+        'budget': 'moderate',  # Default
+        'min_rating': 4.0,
+        'party_size': 2
+    }
+    
+    result = get_smart_recommendations(preferences)
+    
+    if result and result.get('success'):
+        restaurants = result['data']
+        meta = result['meta']
+        
+        st.session_state.restaurants = restaurants[:5]
+        
+        response_msg = f"{meta['message']} "
+        if meta['response_time'] < 1.0:
+            response_msg += f"(Found in {meta['response_time']:.3f}s)"
+        
+        return response_msg
+    else:
+        return "I'm having trouble generating recommendations right now. Please try again or browse our restaurant collection."
+
 def process_user_input(user_input: str):
-    return ai_agent.chat(user_input)
+    # First check for AI agent response
+    ai_response = ai_agent.chat(user_input)
+    if ai_response and ai_response.strip():
+        return ai_response
+    
+    # Fallback to rule-based responses
     user_input_lower = user_input.lower()
     
     if any(word in user_input_lower for word in ['find', 'search', 'restaurant', 'food', 'cuisine']):
@@ -713,7 +764,7 @@ def process_user_input(user_input: str):
     elif any(word in user_input_lower for word in ['book', 'reserve', 'table']):
         return "I'd be delighted to help you secure a table! Please navigate to our 'Reserve Table' section to complete your booking with our streamlined reservation system."
     elif any(word in user_input_lower for word in ['recommend', 'suggest', 'best']):
-        return "Let me curate our finest dining recommendations for you! Visit our 'Discover' section to explore our carefully selected top-rated establishments."
+        return handle_recommendation_request(user_input)
     else:
         return "I'm here to enhance your dining journey! I can help you discover exceptional restaurants, make seamless reservations, or provide personalized recommendations based on your preferences. What culinary adventure shall we plan today?"
 
@@ -724,6 +775,7 @@ def handle_restaurant_search(user_input):
     for cuisine in cuisines:
         if cuisine in user_input.lower():
             found_cuisine = cuisine.title()
+            st.session_state['last_cuisine_search'] = found_cuisine
             break
     
     if found_cuisine:
@@ -769,8 +821,6 @@ with col4:
     if st.button("🔍 Discover", key="nav_discover", use_container_width=True):
         st.session_state.current_page = "Discover"
         st.rerun()
-
-# [Rest of the application logic remains the same but with enhanced AI interface]
 
 # Main content based on current page
 if st.session_state.current_page == "Home":
@@ -890,8 +940,6 @@ elif st.session_state.current_page == "Chat":
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# [Continue with the rest of the pages - Booking and Discover sections remain the same]
-
 elif st.session_state.current_page == "Booking":
     st.markdown('<div class="booking-form">', unsafe_allow_html=True)
     st.markdown("### 📋 Reserve Your Perfect Table")
@@ -993,26 +1041,48 @@ elif st.session_state.current_page == "Discover":
     with col4:
         city_filter = st.selectbox("📍 Location", ["All Cities", "New York", "Los Angeles", "Chicago", "San Francisco", "Miami"], key="city_filter")
     
-    if st.button("🔍 Search Restaurants", use_container_width=True, key="search_restaurants"):
-        params = []
-        if cuisine_filter != "All Cuisines":
-            params.append(f"cuisine={cuisine_filter}")
-        if price_filter != "Any Budget":
-            params.append(f"price_range={price_filter}")
-        if rating_filter > 1.0:
-            params.append(f"min_rating={rating_filter}")
-        if city_filter != "All Cities":
-            params.append(f"city={city_filter}")
-        
-        endpoint = "restaurants"
-        if params:
-            endpoint += "?" + "&".join(params)
-        
-        with st.spinner("Discovering restaurants..."):
-            result = make_api_request(endpoint)
-            if result and result.get('success'):
-                st.session_state.restaurants = result['data']
-                st.rerun()
+    # Smart Recommendations Button
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔍 Search Restaurants", use_container_width=True, key="search_restaurants"):
+            params = []
+            if cuisine_filter != "All Cuisines":
+                params.append(f"cuisine={cuisine_filter}")
+                st.session_state['last_cuisine_search'] = cuisine_filter
+            if price_filter != "Any Budget":
+                params.append(f"price_range={price_filter}")
+            if rating_filter > 1.0:
+                params.append(f"min_rating={rating_filter}")
+            if city_filter != "All Cities":
+                params.append(f"city={city_filter}")
+                st.session_state['last_city_search'] = city_filter
+            
+            endpoint = "restaurants"
+            if params:
+                endpoint += "?" + "&".join(params)
+            
+            with st.spinner("Discovering restaurants..."):
+                result = make_api_request(endpoint)
+                if result and result.get('success'):
+                    st.session_state.restaurants = result['data']
+                    st.rerun()
+    
+    with col2:
+        if st.button("🎯 Smart Recommendations", use_container_width=True, key="smart_recommendations"):
+            with st.spinner("Getting personalized recommendations..."):
+                preferences = {
+                    'cuisine': cuisine_filter if cuisine_filter != "All Cuisines" else None,
+                    'city': city_filter if city_filter != "All Cities" else None,
+                    'budget': price_filter if price_filter != "Any Budget" else 'moderate',
+                    'min_rating': rating_filter,
+                    'party_size': 2
+                }
+                
+                result = get_smart_recommendations(preferences)
+                if result and result.get('success'):
+                    st.session_state.restaurants = result['data']
+                    st.success(f"Found {len(result['data'])} personalized recommendations!")
+                    st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
     
