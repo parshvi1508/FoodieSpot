@@ -4,6 +4,7 @@ import json
 from datetime import datetime, date, timedelta
 import pandas as pd
 import logging
+from ai_agent import ai_agent
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -703,7 +704,8 @@ def get_restaurants_from_api():
         return []
     return st.session_state['cached_restaurants']
 
-def process_user_input(user_input):
+def process_user_input(user_input: str):
+    return ai_agent.chat(user_input)
     user_input_lower = user_input.lower()
     
     if any(word in user_input_lower for word in ['find', 'search', 'restaurant', 'food', 'cuisine']):
