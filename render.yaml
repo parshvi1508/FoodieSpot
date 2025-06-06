@@ -1,0 +1,32 @@
+# render.yaml
+services:
+  # Flask Backend API
+  - type: web
+    name: foodiespot-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    plan: free
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: TOGETHER_API_KEY
+        sync: false
+      - key: FLASK_ENV
+        value: production
+
+  # Streamlit Frontend
+  - type: web
+    name: foodiespot-frontend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run streamlit_app.py --server.port $PORT --server.address 0.0.0.0
+    plan: free
+    envVars:
+      - key: API_BASE_URL
+        fromService:
+          type: web
+          name: foodiespot-api
+          property: host
