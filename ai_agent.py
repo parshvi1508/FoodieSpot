@@ -317,46 +317,45 @@ class RestaurantAI:
         return "Unable to check availability. Please try again or contact the restaurant directly."
     
     def _process_tool_create_reservation(self, parameters: Dict[str, Any]) -> str:
-        """Process reservation creation tool call."""
         logger.info(f"Raw parameters received: {parameters}")
     
-        # Get restaurant ID by name if needed
+    # Get restaurant ID by name if needed
         restaurant_id = parameters.get('restaurant_id')
         if not restaurant_id:
-            # If no restaurant_id, try to find by name
             restaurant_name = parameters.get('restaurant_name')
             if restaurant_name:
                 restaurants_result = self._call_api("restaurants", {}, method="GET")
                 if restaurants_result and restaurants_result.get('data'):
                     restaurant = next((r for r in restaurants_result['data'] 
-                        if r['name'].lower() == restaurant_name.lower()), None)
+                                    if r['name'].lower() == restaurant_name.lower()), None)
                     if restaurant:
                         restaurant_id = restaurant['id']
     
-                    # Ensure all data is properly formatted
-        reservation_data = {
-            "restaurant_id": str(restaurant_id) if restaurant_id else None,
+    # FIXED: Proper data formatting with validation
+        try:
+            reservation_data = {
+            "restaurant_id": str(restaurant_id) if restaurant_id else "",
             "user_name": str(parameters.get('customer_name', '')),
             "user_email": str(parameters.get('customer_email', '')),
-            "party_size": int(parameters.get('party_size', 0)) if parameters.get('party_size') else None,
-            "date": str(parameters.get('reservation_date', '')),  # Ensure string format
-            "time": str(parameters.get('reservation_time', '')),  # Ensure string format
+            "party_size": int(parameters.get('party_size', 0)),
+            "date": str(parameters.get('reservation_date', '')),
+            "time": str(parameters.get('reservation_time', '')),
             "special_requests": str(parameters.get('special_requests', ''))
-    }
-    
-        logger.info(f"Formatted reservation data: {reservation_data}")
-    
-        # Validate required fields
-        required_fields = ['restaurant_id', 'user_name', 'user_email', 'party_size', 'date', 'time']
-        missing_fields = [field for field in required_fields if not reservation_data.get(field)]
-    
-        if missing_fields:
-            error_msg = f"Missing required information: {', '.join(missing_fields)}"
-            logger.error(error_msg)
-            return error_msg
-
-    # Make API call
-        try:
+        }
+        
+        # Validate required fields are not empty
+            required_fields = ['restaurant_id', 'user_name', 'user_email', 'party_size', 'date', 'time']
+            missing_fields = [field for field in required_fields 
+                            if not reservation_data.get(field) or reservation_data[field] == "" or reservation_data[field] == 0]
+        
+            if missing_fields:
+                error_msg = f"Missing required information: {', '.join(missing_fields)}"
+                logger.error(error_msg)
+                return error_msg
+        
+            logger.info(f"Formatted reservation data: {reservation_data}")
+        
+        # Make API call
             result = self._call_api("reservations", reservation_data, method="POST")
             logger.info(f"API call result: {result}")
         
