@@ -1,13 +1,13 @@
 import os
 import json
 import logging
-import sqlite3
 import uuid
 import requests
 from datetime import datetime, date
 from typing import Dict, List, Optional, Any
 from together import Together
 from dotenv import load_dotenv
+from supabase import create_client, Client
 
 # Load environment variables
 load_dotenv()
@@ -19,22 +19,28 @@ logger = logging.getLogger(__name__)
 class RestaurantAI:
     """
     AI Agent for restaurant search, availability checking, and reservation management.
-    Uses Together AI for natural language processing with fallback between API and local database.
+    Uses Together AI for natural language processing with fallback between API and Supabase database.
     """
     
-    def __init__(self, api_base_url: Optional[str] = None, db_path: Optional[str] = None, use_api_first: bool = True):
+    def __init__(self, api_base_url: Optional[str] = None, use_api_first: bool = True):
         """
         Initialize the Restaurant AI agent with dual mode support.
         
         Args:
             api_base_url: Base URL for the Flask API
-            db_path: Path to SQLite database file for fallback
             use_api_first: Whether to try API first before falling back to database
         """
         # Validate API key
         api_key = os.getenv('TOGETHER_API_KEY')
         if not api_key:
             raise ValueError("TOGETHER_API_KEY environment variable is required")
+        
+        # Validate Supabase credentials
+        supabase_url = os.getenv('SUPABASE_URL')
+        supabase_anon_key = os.getenv('SUPABASE_ANON_KEY')
+        
+        if not supabase_url or not supabase_anon_key:
+            raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY environment variables are required")
         
         self.client = Together(api_key=api_key)
         self.context: List[Dict[str, Any]] = []
@@ -45,8 +51,8 @@ class RestaurantAI:
         self.use_api_first = use_api_first
         self.api_available = None  # Cache API availability status
         
-        # Database configuration for fallback
-        self.db_path = db_path or os.getenv('DATABASE_PATH', 'restaurants.db')
+        # Supabase configuration for fallback
+        self.supabase: Client = create_client(supabase_url, supabase_anon_key)
         self.db_initialized = False
         
         # Test connections on startup
@@ -84,7 +90,7 @@ class RestaurantAI:
         self.tools = self._initialize_tools()
     
     def _test_connections(self):
-        """Test both API and database connections on startup."""
+        """Test both API and Supabase connections on startup."""
         # Test API connection
         try:
             response = requests.get(f"{self.api_base}/restaurants", timeout=5)
@@ -98,89 +104,173 @@ class RestaurantAI:
             self.api_available = False
             logger.warning(f"⚠️ API connection failed: {e}")
         
-        # Initialize database as fallback
+        # Test Supabase connection and initialize
         try:
-            self._init_database()
-            logger.info("✅ Database fallback ready")
+            self._init_supabase()
+            logger.info("✅ Supabase connection successful")
         except Exception as e:
-            logger.error(f"❌ Database initialization failed: {e}")
+            logger.error(f"❌ Supabase initialization failed: {e}")
     
-    def _init_database(self):
-        """Initialize the SQLite database with required tables."""
+    def _init_supabase(self):
+        """Initialize Supabase tables and sample data if needed."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                
-                # Create restaurants table
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS restaurants (
-                        id TEXT PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        cuisine TEXT,
-                        city TEXT,
-                        price_range TEXT,
-                        rating REAL,
-                        phone TEXT,
-                        address TEXT,
-                        description TEXT,
-                        image_url TEXT,
-                        capacity INTEGER DEFAULT 50,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-                
-                # Create reservations table
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS reservations (
-                        id TEXT PRIMARY KEY,
-                        restaurant_id TEXT,
-                        user_name TEXT NOT NULL,
-                        user_email TEXT NOT NULL,
-                        party_size INTEGER NOT NULL,
-                        date TEXT NOT NULL,
-                        time TEXT NOT NULL,
-                        special_requests TEXT,
-                        status TEXT DEFAULT 'confirmed',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (restaurant_id) REFERENCES restaurants (id)
-                    )
-                ''')
-                
-                # Insert sample data if tables are empty
-                cursor.execute('SELECT COUNT(*) FROM restaurants')
-                if cursor.fetchone()[0] == 0:
-                    self._insert_sample_data(cursor)
-                
-                conn.commit()
-                self.db_initialized = True
-                
+            # Check if restaurants table exists and has data
+            result = self.supabase.table('restaurants').select('id').limit(1).execute()
+            
+            if len(result.data) == 0:
+                logger.info("No restaurants found, inserting sample data...")
+                self._insert_sample_data_supabase()
+            
+            self.db_initialized = True
+            logger.info("✅ Supabase database ready")
+            
         except Exception as e:
-            logger.error(f"❌ Database initialization failed: {e}")
+            logger.error(f"❌ Supabase initialization failed: {e}")
+            # Try to create tables if they don't exist (this would need to be done via Supabase dashboard or SQL)
+            logger.info("Please ensure the following tables exist in your Supabase database:")
+            logger.info("""
+            -- Restaurants table
+            CREATE TABLE restaurants (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name TEXT NOT NULL,
+                cuisine TEXT,
+                city TEXT,
+                price_range TEXT,
+                rating DECIMAL(2,1),
+                phone TEXT,
+                address TEXT,
+                description TEXT,
+                image_url TEXT,
+                capacity INTEGER DEFAULT 50,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+            
+            -- Reservations table
+            CREATE TABLE reservations (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                restaurant_id UUID REFERENCES restaurants(id),
+                user_name TEXT NOT NULL,
+                user_email TEXT NOT NULL,
+                party_size INTEGER NOT NULL,
+                date DATE NOT NULL,
+                time TIME NOT NULL,
+                special_requests TEXT,
+                status TEXT DEFAULT 'confirmed',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+            """)
             raise
     
-    def _insert_sample_data(self, cursor):
-        """Insert sample restaurant data."""
+    def _insert_sample_data_supabase(self):
+        """Insert sample restaurant data into Supabase."""
         sample_restaurants = [
-            (str(uuid.uuid4()), "Bangkok Street", "Thai", "New York", "$$", 4.5, "555-0101", "123 Thai St", "Authentic Thai cuisine", "", 40),
-            (str(uuid.uuid4()), "Amalfi Coast Cafe", "Italian", "New York", "$$$", 4.7, "555-0102", "456 Italian Ave", "Traditional Italian dining", "", 60),
-            (str(uuid.uuid4()), "Dragon Palace", "Chinese", "New York", "$$", 4.3, "555-0103", "789 Dragon Rd", "Classic Chinese dishes", "", 80),
-            (str(uuid.uuid4()), "Le Petit Bistro", "French", "Paris", "$$$$", 4.8, "555-0104", "321 French Blvd", "Fine French cuisine", "", 35),
-            (str(uuid.uuid4()), "Taco Fiesta", "Mexican", "Los Angeles", "$", 4.2, "555-0105", "654 Taco Lane", "Authentic Mexican food", "", 55),
-            (str(uuid.uuid4()), "Sakura Sushi", "Japanese", "Los Angeles", "$$$", 4.6, "555-0106", "987 Sushi Way", "Fresh sushi and sashimi", "", 45),
-            (str(uuid.uuid4()), "Curry House", "Indian", "Chicago", "$$", 4.4, "555-0107", "246 Spice Ave", "Traditional Indian curry", "", 65),
-            (str(uuid.uuid4()), "The Steakhouse", "American", "Chicago", "$$$$", 4.9, "555-0108", "135 Meat St", "Premium steaks and grills", "", 50),
+            {
+                "name": "Bangkok Street",
+                "cuisine": "Thai",
+                "city": "New York",
+                "price_range": "$$",
+                "rating": 4.5,
+                "phone": "555-0101",
+                "address": "123 Thai St",
+                "description": "Authentic Thai cuisine",
+                "image_url": "",
+                "capacity": 40
+            },
+            {
+                "name": "Amalfi Coast Cafe",
+                "cuisine": "Italian",
+                "city": "New York",
+                "price_range": "$$$",
+                "rating": 4.7,
+                "phone": "555-0102",
+                "address": "456 Italian Ave",
+                "description": "Traditional Italian dining",
+                "image_url": "",
+                "capacity": 60
+            },
+            {
+                "name": "Dragon Palace",
+                "cuisine": "Chinese",
+                "city": "New York",
+                "price_range": "$$",
+                "rating": 4.3,
+                "phone": "555-0103",
+                "address": "789 Dragon Rd",
+                "description": "Classic Chinese dishes",
+                "image_url": "",
+                "capacity": 80
+            },
+            {
+                "name": "Le Petit Bistro",
+                "cuisine": "French",
+                "city": "Paris",
+                "price_range": "$$$$",
+                "rating": 4.8,
+                "phone": "555-0104",
+                "address": "321 French Blvd",
+                "description": "Fine French cuisine",
+                "image_url": "",
+                "capacity": 35
+            },
+            {
+                "name": "Taco Fiesta",
+                "cuisine": "Mexican",
+                "city": "Los Angeles",
+                "price_range": "$",
+                "rating": 4.2,
+                "phone": "555-0105",
+                "address": "654 Taco Lane",
+                "description": "Authentic Mexican food",
+                "image_url": "",
+                "capacity": 55
+            },
+            {
+                "name": "Sakura Sushi",
+                "cuisine": "Japanese",
+                "city": "Los Angeles",
+                "price_range": "$$$",
+                "rating": 4.6,
+                "phone": "555-0106",
+                "address": "987 Sushi Way",
+                "description": "Fresh sushi and sashimi",
+                "image_url": "",
+                "capacity": 45
+            },
+            {
+                "name": "Curry House",
+                "cuisine": "Indian",
+                "city": "Chicago",
+                "price_range": "$$",
+                "rating": 4.4,
+                "phone": "555-0107",
+                "address": "246 Spice Ave",
+                "description": "Traditional Indian curry",
+                "image_url": "",
+                "capacity": 65
+            },
+            {
+                "name": "The Steakhouse",
+                "cuisine": "American",
+                "city": "Chicago",
+                "price_range": "$$$$",
+                "rating": 4.9,
+                "phone": "555-0108",
+                "address": "135 Meat St",
+                "description": "Premium steaks and grills",
+                "image_url": "",
+                "capacity": 50
+            }
         ]
         
-        cursor.executemany('''
-            INSERT INTO restaurants (id, name, cuisine, city, price_range, rating, phone, address, description, image_url, capacity)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', sample_restaurants)
-        
-        logger.info("✅ Sample restaurant data inserted")
+        try:
+            result = self.supabase.table('restaurants').insert(sample_restaurants).execute()
+            logger.info(f"✅ Inserted {len(sample_restaurants)} sample restaurants")
+        except Exception as e:
+            logger.error(f"❌ Failed to insert sample data: {e}")
     
     def _call_api(self, endpoint: str, params: Dict[str, Any], method: str = "POST") -> Optional[Dict[str, Any]]:
         """
-        Make API calls with automatic fallback to database.
+        Make API calls with automatic fallback to Supabase.
         
         Args:
             endpoint: API endpoint to call
@@ -188,7 +278,7 @@ class RestaurantAI:
             method: HTTP method (GET or POST)
             
         Returns:
-            API response data or database fallback result
+            API response data or Supabase fallback result
         """
         # Try API first if available and preferred
         if self.use_api_first and self.api_available:
@@ -213,194 +303,172 @@ class RestaurantAI:
                 if response.status_code in [200, 201]:
                     return response.json()
                 else:
-                    logger.warning(f"API Error: {response.status_code}, falling back to database")
+                    logger.warning(f"API Error: {response.status_code}, falling back to Supabase")
                     
             except Exception as e:
-                logger.warning(f"API call failed: {e}, falling back to database")
+                logger.warning(f"API call failed: {e}, falling back to Supabase")
         
-        # Fallback to database
-        return self._database_fallback(endpoint, params, method)
+        # Fallback to Supabase
+        return self._supabase_fallback(endpoint, params, method)
     
-    def _database_fallback(self, endpoint: str, params: Dict[str, Any], method: str) -> Optional[Dict[str, Any]]:
-        """Handle database operations as fallback."""
+    def _supabase_fallback(self, endpoint: str, params: Dict[str, Any], method: str) -> Optional[Dict[str, Any]]:
+        """Handle Supabase operations as fallback."""
         if not self.db_initialized:
             return None
         
         try:
             if endpoint == "restaurants":
-                return self._db_search_restaurants(params)
+                return self._supabase_search_restaurants(params)
             elif endpoint == "reservations":
-                return self._db_create_reservation(params)
+                return self._supabase_create_reservation(params)
             elif endpoint == "availability":
-                return self._db_check_availability(params)
+                return self._supabase_check_availability(params)
             elif endpoint.startswith("recommendations"):
-                return self._db_get_recommendations(params)
+                return self._supabase_get_recommendations(params)
             else:
-                logger.warning(f"Unknown database endpoint: {endpoint}")
+                logger.warning(f"Unknown Supabase endpoint: {endpoint}")
                 return None
                 
         except Exception as e:
-            logger.error(f"Database fallback error: {e}")
+            logger.error(f"Supabase fallback error: {e}")
             return None
     
-    def _db_search_restaurants(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Search restaurants in database."""
-        query = "SELECT * FROM restaurants WHERE 1=1"
-        sql_params = []
-        
-        if params.get('cuisine'):
-            query += " AND LOWER(cuisine) LIKE LOWER(?)"
-            sql_params.append(f"%{params['cuisine']}%")
-        
-        if params.get('city'):
-            query += " AND LOWER(city) LIKE LOWER(?)"
-            sql_params.append(f"%{params['city']}%")
-        
-        if params.get('price_range'):
-            query += " AND price_range = ?"
-            sql_params.append(params['price_range'])
-        
-        if params.get('min_rating'):
-            query += " AND rating >= ?"
-            sql_params.append(params['min_rating'])
-        
-        query += " ORDER BY rating DESC"
-        
-        restaurants = self._execute_query(query, tuple(sql_params))
-        return {
-            "success": True,
-            "data": restaurants or [],
-            "source": "database"
-        }
-    
-    def _db_create_reservation(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Create reservation in database."""
-        reservation_id = str(uuid.uuid4())
-        
-        result = self._execute_query(
-            '''INSERT INTO reservations 
-               (id, restaurant_id, user_name, user_email, party_size, date, time, special_requests)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-            (
-                reservation_id,
-                params.get('restaurant_id'),
-                params.get('user_name'),
-                params.get('user_email'),
-                params.get('party_size'),
-                params.get('date'),
-                params.get('time'),
-                params.get('special_requests', '')
-            )
-        )
-        
-        if result and result > 0:
+    def _supabase_search_restaurants(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Search restaurants in Supabase."""
+        try:
+            query = self.supabase.table('restaurants').select('*')
+            
+            if params.get('cuisine'):
+                query = query.ilike('cuisine', f"%{params['cuisine']}%")
+            
+            if params.get('city'):
+                query = query.ilike('city', f"%{params['city']}%")
+            
+            if params.get('price_range'):
+                query = query.eq('price_range', params['price_range'])
+            
+            if params.get('min_rating'):
+                query = query.gte('rating', params['min_rating'])
+            
+            query = query.order('rating', desc=True)
+            result = query.execute()
+            
             return {
                 "success": True,
-                "reservation_id": reservation_id,
-                "source": "database"
+                "data": result.data or [],
+                "source": "supabase"
             }
-        else:
-            return {
-                "success": False,
-                "error": "Failed to create reservation",
-                "source": "database"
-            }
-    
-    def _db_check_availability(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Check availability in database."""
-        restaurant_name = params.get('restaurant_name', '')
-        date = params.get('date', '')
-        time = params.get('time', '')
-        
-        # Get restaurant
-        restaurant = self._execute_query(
-            "SELECT * FROM restaurants WHERE LOWER(name) = LOWER(?)",
-            (restaurant_name,),
-            fetch_one=True
-        )
-        
-        if not restaurant:
-            return {"success": False, "error": "Restaurant not found", "source": "database"}
-        
-        # Check existing reservations
-        existing = self._execute_query(
-            "SELECT COUNT(*) as count FROM reservations WHERE restaurant_id = ? AND date = ? AND time = ?",
-            (restaurant['id'], date, time)
-        )
-        
-        capacity = restaurant.get('capacity', 50)
-        current_reservations = existing[0]['count'] if existing else 0
-        available_seats = capacity - current_reservations
-        
-        return {
-            "success": True,
-            "available": available_seats > 0,
-            "available_seats": available_seats,
-            "restaurant_name": restaurant['name'],
-            "source": "database"
-        }
-    
-    def _db_get_recommendations(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Get recommendations from database."""
-        query = "SELECT * FROM restaurants WHERE 1=1"
-        sql_params = []
-        
-        if params.get('cuisine'):
-            query += " AND LOWER(cuisine) LIKE LOWER(?)"
-            sql_params.append(f"%{params['cuisine']}%")
-        
-        if params.get('city'):
-            query += " AND LOWER(city) LIKE LOWER(?)"
-            sql_params.append(f"%{params['city']}%")
-        
-        if params.get('min_rating'):
-            query += " AND rating >= ?"
-            sql_params.append(params['min_rating'])
-        
-        # Map budget to price range
-        if params.get('budget'):
-            budget_map = {"budget": "$", "moderate": "$$", "upscale": "$$$", "luxury": "$$$$"}
-            price_range = budget_map.get(params['budget'])
-            if price_range:
-                query += " AND price_range = ?"
-                sql_params.append(price_range)
-        
-        query += " ORDER BY rating DESC LIMIT 5"
-        
-        restaurants = self._execute_query(query, tuple(sql_params))
-        
-        return {
-            "success": True,
-            "data": restaurants or [],
-            "meta": {
-                "message": "Here are my top recommendations based on your preferences",
-                "source": "database"
-            },
-            "source": "database"
-        }
-    
-    def _execute_query(self, query: str, params: tuple = (), fetch_one: bool = False):
-        """Execute database query with error handling."""
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-                cursor.execute(query, params)
-                
-                if query.strip().upper().startswith('SELECT'):
-                    if fetch_one:
-                        result = cursor.fetchone()
-                        return dict(result) if result else None
-                    else:
-                        results = cursor.fetchall()
-                        return [dict(row) for row in results]
-                else:
-                    conn.commit()
-                    return cursor.rowcount
-                    
+            
         except Exception as e:
-            logger.error(f"Database query error: {e}")
-            return None
+            logger.error(f"Supabase search error: {e}")
+            return {"success": False, "error": str(e), "source": "supabase"}
+    
+    def _supabase_create_reservation(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Create reservation in Supabase."""
+        try:
+            reservation_data = {
+                "restaurant_id": params.get('restaurant_id'),
+                "user_name": params.get('user_name'),
+                "user_email": params.get('user_email'),
+                "party_size": params.get('party_size'),
+                "date": params.get('date'),
+                "time": params.get('time'),
+                "special_requests": params.get('special_requests', '')
+            }
+            
+            result = self.supabase.table('reservations').insert(reservation_data).execute()
+            
+            if result.data:
+                return {
+                    "success": True,
+                    "reservation_id": result.data[0]['id'],
+                    "source": "supabase"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": "Failed to create reservation",
+                    "source": "supabase"
+                }
+                
+        except Exception as e:
+            logger.error(f"Supabase reservation error: {e}")
+            return {"success": False, "error": str(e), "source": "supabase"}
+    
+    def _supabase_check_availability(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Check availability in Supabase."""
+        try:
+            restaurant_name = params.get('restaurant_name', '')
+            date = params.get('date', '')
+            time = params.get('time', '')
+            
+            # Get restaurant
+            restaurant_result = self.supabase.table('restaurants').select('*').ilike('name', restaurant_name).limit(1).execute()
+            
+            if not restaurant_result.data:
+                return {"success": False, "error": "Restaurant not found", "source": "supabase"}
+            
+            restaurant = restaurant_result.data[0]
+            
+            # Check existing reservations for the same date and time
+            reservations_result = self.supabase.table('reservations').select('party_size').eq('restaurant_id', restaurant['id']).eq('date', date).eq('time', time).execute()
+            
+            capacity = restaurant.get('capacity', 50)
+            current_bookings = sum(r['party_size'] for r in reservations_result.data)
+            available_seats = capacity - current_bookings
+            
+            return {
+                "success": True,
+                "available": available_seats > 0,
+                "available_seats": max(0, available_seats),
+                "restaurant_name": restaurant['name'],
+                "source": "supabase"
+            }
+            
+        except Exception as e:
+            logger.error(f"Supabase availability error: {e}")
+            return {"success": False, "error": str(e), "source": "supabase"}
+    
+    def _supabase_get_recommendations(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Get recommendations from Supabase."""
+        try:
+            query = self.supabase.table('restaurants').select('*')
+            
+            if params.get('cuisine'):
+                query = query.ilike('cuisine', f"%{params['cuisine']}%")
+            
+            if params.get('city'):
+                query = query.ilike('city', f"%{params['city']}%")
+            
+            if params.get('min_rating'):
+                query = query.gte('rating', params['min_rating'])
+            
+            # Map budget to price range
+            if params.get('budget'):
+                budget_map = {"budget": "$", "moderate": "$", "upscale": "$$", "luxury": "$$"}
+                price_range = budget_map.get(params['budget'])
+                if price_range:
+                    query = query.eq('price_range', price_range)
+            
+            if params.get('price_range'):
+                query = query.eq('price_range', params['price_range'])
+            
+            query = query.order('rating', desc=True).limit(5)
+            result = query.execute()
+            
+            return {
+                "success": True,
+                "data": result.data or [],
+                "meta": {
+                    "message": "Here are my top recommendations based on your preferences",
+                    "source": "supabase"
+                },
+                "source": "supabase"
+            }
+            
+        except Exception as e:
+            logger.error(f"Supabase recommendations error: {e}")
+            return {"success": False, "error": str(e), "source": "supabase"}
     
     def _validate_and_fix_date(self, date_str: str) -> str:
         """Validate and fix date format, handling 2024/2025 issue."""
@@ -452,8 +520,8 @@ class RestaurantAI:
                             },
                             "price_range": {
                                 "type": "string",
-                                "enum": ["$", "$$", "$$$", "$$$$"],
-                                "description": "Price range from $ (budget) to $$$$ (luxury)"
+                                "enum": ["$", "$", "$$", "$$"],
+                                "description": "Price range from $ (budget) to $$ (luxury)"
                             },
                             "min_rating": {
                                 "type": "number",
@@ -476,7 +544,7 @@ class RestaurantAI:
                         "properties": {
                             "restaurant_name": {
                                 "type": "string",
-                                "description": "Name of the restaurant (e.g., 'Bangkok Street', 'Amalfi Coast Cafe')"
+                                "description": "Name of the restaurant"
                             },
                             "date": {
                                 "type": "string",
@@ -506,7 +574,7 @@ class RestaurantAI:
                         "properties": {
                             "restaurant_name": {
                                 "type": "string",
-                                "description": "Name of the restaurant (e.g., 'Bangkok Street', 'Amalfi Coast Cafe')"
+                                "description": "Name of the restaurant"
                             },
                             "customer_name": {
                                 "type": "string",
@@ -561,7 +629,7 @@ class RestaurantAI:
                             },
                             "price_range": {
                                 "type": "string",
-                                "enum": ["$", "$$", "$$$", "$$$$"],
+                                "enum": ["$", "$", "$$", "$$"],
                                 "description": "Price range preference"
                             },
                             "min_rating": {
@@ -834,30 +902,32 @@ class RestaurantAI:
         try:
             db_stats = {}
             if self.db_initialized:
-                restaurants_count = self._execute_query("SELECT COUNT(*) as count FROM restaurants")[0]['count']
-                reservations_count = self._execute_query("SELECT COUNT(*) as count FROM reservations")[0]['count']
+                restaurants_result = self.supabase.table('restaurants').select('id', count='exact').execute()
+                reservations_result = self.supabase.table('reservations').select('id', count='exact').execute()
                 db_stats = {
-                    "restaurants": restaurants_count,
-                    "reservations": reservations_count
+                    "restaurants": restaurants_result.count,
+                    "reservations": reservations_result.count
                 }
             
             return {
                 "api_available": self.api_available,
                 "api_base": self.api_base,
                 "database_initialized": self.db_initialized,
-                "database_path": self.db_path,
+                "database_type": "supabase",
                 "database_stats": db_stats,
                 "use_api_first": self.use_api_first
             }
         except Exception as e:
             return {"error": str(e)}
 
-# Initialize singleton agent with smart fallback
+# Initialize singleton agent with Supabase fallback
 try:
     ai_agent = RestaurantAI()
-    logger.info("Restaurant AI agent initialized successfully")
+    logger.info("Restaurant AI agent initialized successfully with Supabase")
     status = ai_agent.get_status()
-    logger.info(f"System status: API={'✅' if status['api_available'] else '❌'} | DB={'✅' if status['database_initialized'] else '❌'}")
+    logger.info(f"System status: API={'✅' if status['api_available'] else '❌'} | Supabase={'✅' if status['database_initialized'] else '❌'}")
+    if status.get('database_stats'):
+        logger.info(f"Database contains {status['database_stats']['restaurants']} restaurants and {status['database_stats']['reservations']} reservations")
 except Exception as e:
     logger.error(f"Failed to initialize Restaurant AI agent: {e}")
     ai_agent = None
