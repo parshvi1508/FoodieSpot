@@ -7,6 +7,7 @@ import logging
 from ai_agent import ai_agent
 import os
 from dotenv import load_dotenv
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,8 +22,8 @@ st.set_page_config(
 
 # Load environment variables
 load_dotenv()
-
 API_BASE_URL = os.getenv('API_BASE_URL', 'https://foodiespot-vzs5.onrender.com/api')
+
 # Enhanced Responsive CSS with Professional Food Theme
 st.markdown("""
 <style>
@@ -31,53 +32,17 @@ st.markdown("""
     /* Global Reset with Enhanced Food Colors */
     .stApp {
         background: linear-gradient(135deg, 
-            rgba(215, 53, 39, 0.08) 0%,    /* Rich Tomato Red */
-            rgba(244, 162, 97, 0.06) 20%,  /* Warm Paprika */
-            rgba(139, 90, 60, 0.08) 40%,   /* Coffee Brown */
-            rgba(205, 133, 63, 0.06) 60%,  /* Sandy Brown */
-            rgba(160, 82, 45, 0.08) 80%,   /* Saddle Brown */
-            rgba(218, 165, 32, 0.06) 100%  /* Goldenrod */
+            rgba(215, 53, 39, 0.08) 0%,
+            rgba(244, 162, 97, 0.06) 20%,
+            rgba(139, 90, 60, 0.08) 40%,
+            rgba(205, 133, 63, 0.06) 60%,
+            rgba(160, 82, 45, 0.08) 80%,
+            rgba(218, 165, 32, 0.06) 100%
         );
         background-attachment: fixed;
         font-family: 'Inter', sans-serif;
         font-weight: 400;
         color: #2c1810;
-    }
-    
-    /* Enhanced Animated Background */
-    .stApp::before {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-image: 
-            radial-gradient(circle at 15% 85%, rgba(215, 53, 39, 0.12) 0%, transparent 45%),
-            radial-gradient(circle at 85% 15%, rgba(244, 162, 97, 0.1) 0%, transparent 45%),
-            radial-gradient(circle at 45% 45%, rgba(139, 90, 60, 0.08) 0%, transparent 45%),
-            radial-gradient(circle at 70% 80%, rgba(218, 165, 32, 0.08) 0%, transparent 45%);
-        z-index: -1;
-        animation: foodieFlow 30s ease-in-out infinite;
-    }
-    
-    @keyframes foodieFlow {
-        0%, 100% { 
-            transform: scale(1) rotate(0deg);
-            opacity: 0.8;
-        }
-        25% { 
-            transform: scale(1.02) rotate(0.3deg);
-            opacity: 0.9;
-        }
-        50% { 
-            transform: scale(1.04) rotate(0.6deg);
-            opacity: 1;
-        }
-        75% { 
-            transform: scale(1.01) rotate(-0.3deg);
-            opacity: 0.85;
-        }
     }
     
     /* Enhanced Navigation Header */
@@ -92,12 +57,6 @@ st.markdown("""
         position: sticky;
         top: 0.5rem;
         z-index: 100;
-        animation: headerFloat 8s ease-in-out infinite;
-    }
-    
-    @keyframes headerFloat {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-3px); }
     }
     
     .nav-title {
@@ -110,13 +69,6 @@ st.markdown("""
         text-align: center;
         margin: 0;
         letter-spacing: -1px;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
-        animation: titleShimmer 6s ease-in-out infinite;
-    }
-    
-    @keyframes titleShimmer {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.01); }
     }
     
     .nav-subtitle {
@@ -127,15 +79,9 @@ st.markdown("""
         font-weight: 500;
         font-family: 'Roboto', sans-serif;
         letter-spacing: 0.5px;
-        animation: subtitleGlow 4s ease-in-out infinite;
     }
     
-    @keyframes subtitleGlow {
-        0%, 100% { opacity: 0.8; }
-        50% { opacity: 1; }
-    }
-    
-    /* Enhanced Glass Cards - Responsive */
+    /* Enhanced Glass Cards */
     .glass-card {
         background: rgba(255, 255, 255, 0.35);
         backdrop-filter: blur(25px);
@@ -147,34 +93,6 @@ st.markdown("""
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         overflow: hidden;
-        animation: cardBreathe 12s ease-in-out infinite;
-    }
-    
-    @keyframes cardBreathe {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-4px); }
-    }
-    
-    .glass-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, 
-            transparent, 
-            rgba(215, 53, 39, 0.6), 
-            rgba(244, 162, 97, 0.6), 
-            rgba(218, 165, 32, 0.6), 
-            transparent
-        );
-        animation: borderFlow 4s ease-in-out infinite;
-    }
-    
-    @keyframes borderFlow {
-        0%, 100% { opacity: 0.4; }
-        50% { opacity: 0.8; }
     }
     
     .glass-card:hover {
@@ -183,7 +101,7 @@ st.markdown("""
         border-color: rgba(215, 53, 39, 0.4);
     }
     
-    /* Enhanced Restaurant Cards - Responsive */
+    /* Enhanced Restaurant Cards */
     .restaurant-card {
         background: rgba(255, 255, 255, 0.3);
         backdrop-filter: blur(20px);
@@ -194,28 +112,6 @@ st.markdown("""
         transition: all 0.4s ease;
         position: relative;
         overflow: hidden;
-        animation: cardPulse 15s ease-in-out infinite;
-    }
-    
-    @keyframes cardPulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.01); }
-    }
-    
-    .restaurant-card::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 4px;
-        background: linear-gradient(90deg, #d73527, #e76f51, #f4a261, #daa520);
-        animation: gradientShift 6s ease-in-out infinite;
-    }
-    
-    @keyframes gradientShift {
-        0%, 100% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
     }
     
     .restaurant-card:hover {
@@ -232,12 +128,6 @@ st.markdown("""
         color: #8b5a3c;
         margin-bottom: 0.8rem;
         letter-spacing: -0.5px;
-        animation: nameGlow 8s ease-in-out infinite;
-    }
-    
-    @keyframes nameGlow {
-        0%, 100% { text-shadow: 1px 1px 3px rgba(139, 90, 60, 0.3); }
-        50% { text-shadow: 2px 2px 6px rgba(139, 90, 60, 0.5); }
     }
     
     .restaurant-details {
@@ -257,13 +147,7 @@ st.markdown("""
         padding: clamp(1.5rem, 4vw, 3rem);
         min-height: clamp(400px, 60vh, 700px);
         position: relative;
-        animation: chatPulse 10s ease-in-out infinite;
         box-shadow: 0 20px 60px rgba(215, 53, 39, 0.1);
-    }
-    
-    @keyframes chatPulse {
-        0%, 100% { box-shadow: 0 20px 60px rgba(215, 53, 39, 0.1); }
-        50% { box-shadow: 0 25px 70px rgba(215, 53, 39, 0.15); }
     }
     
     /* AI Chat Messages */
@@ -274,19 +158,7 @@ st.markdown("""
         border-radius: 15px !important;
         margin: 0.8rem 0 !important;
         padding: 1.2rem !important;
-        animation: messageSlideIn 0.5s ease-out !important;
         box-shadow: 0 4px 15px rgba(215, 53, 39, 0.08) !important;
-    }
-    
-    @keyframes messageSlideIn {
-        from { 
-            opacity: 0; 
-            transform: translateY(20px); 
-        }
-        to { 
-            opacity: 1; 
-            transform: translateY(0); 
-        }
     }
     
     .stChatMessage[data-testid="user-message"] {
@@ -318,23 +190,7 @@ st.markdown("""
         box-shadow: 0 0 0 3px rgba(215, 53, 39, 0.1) !important;
     }
     
-    /* Booking Form Enhancement */
-    .booking-form {
-        background: rgba(255, 255, 255, 0.4);
-        backdrop-filter: blur(30px);
-        border: 2px solid rgba(215, 53, 39, 0.25);
-        border-radius: 25px;
-        padding: clamp(1.5rem, 4vw, 2.5rem);
-        box-shadow: 0 20px 60px rgba(215, 53, 39, 0.12);
-        animation: formFloat 12s ease-in-out infinite;
-    }
-    
-    @keyframes formFloat {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-3px); }
-    }
-    
-    /* Enhanced Buttons - Responsive */
+    /* Enhanced Buttons */
     .stButton > button {
         background: linear-gradient(135deg, 
             rgba(215, 53, 39, 0.9) 0%, 
@@ -355,13 +211,7 @@ st.markdown("""
         font-size: clamp(0.9rem, 2vw, 1.1rem);
         letter-spacing: 0.5px;
         text-transform: uppercase;
-        animation: buttonGlow 8s ease-in-out infinite;
         width: 100%;
-    }
-    
-    @keyframes buttonGlow {
-        0%, 100% { box-shadow: 0 8px 25px rgba(215, 53, 39, 0.25); }
-        50% { box-shadow: 0 12px 35px rgba(215, 53, 39, 0.4); }
     }
     
     .stButton > button:hover {
@@ -375,7 +225,7 @@ st.markdown("""
         );
     }
     
-    /* Enhanced Form Elements - Responsive */
+    /* Enhanced Form Elements */
     .stTextInput > div > div > input,
     .stSelectbox > div > div > div,
     .stNumberInput > div > div > input,
@@ -405,7 +255,7 @@ st.markdown("""
         transform: scale(1.01) !important;
     }
     
-    /* Enhanced Metrics - Responsive */
+    /* Enhanced Metrics */
     .metric-card {
         background: rgba(255, 255, 255, 0.3);
         backdrop-filter: blur(20px);
@@ -416,13 +266,7 @@ st.markdown("""
         transition: all 0.4s ease;
         position: relative;
         overflow: hidden;
-        animation: metricFloat 10s ease-in-out infinite;
         box-shadow: 0 10px 30px rgba(215, 53, 39, 0.1);
-    }
-    
-    @keyframes metricFloat {
-        0%, 100% { transform: translateY(0px) rotate(0deg); }
-        50% { transform: translateY(-3px) rotate(0.5deg); }
     }
     
     .metric-card:hover {
@@ -438,12 +282,6 @@ st.markdown("""
         color: #d73527;
         margin-bottom: 0.8rem;
         text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
-        animation: valueCount 5s ease-in-out infinite;
-    }
-    
-    @keyframes valueCount {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.05); }
     }
     
     .metric-label {
@@ -455,27 +293,7 @@ st.markdown("""
         text-transform: uppercase;
     }
     
-    /* Enhanced Typography - Responsive */
-    h1, h2, h3, h4, h5, h6 {
-        font-family: 'Playfair Display', serif;
-        color: #8b5a3c;
-        font-weight: 700;
-        letter-spacing: -0.5px;
-        line-height: 1.2;
-    }
-    
-    h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; }
-    h3 { font-size: clamp(1.4rem, 3vw, 2.2rem); font-weight: 700; }
-    h4 { font-size: clamp(1.2rem, 2.5vw, 1.8rem); font-weight: 600; }
-    
-    p, span, div {
-        font-family: 'Roboto', sans-serif;
-        font-weight: 400;
-        line-height: 1.6;
-        font-size: clamp(0.9rem, 2vw, 1.1rem);
-    }
-    
-    /* Enhanced Success/Error Messages - Responsive */
+    /* Success/Error Messages */
     .success-message {
         background: rgba(76, 175, 80, 0.25);
         backdrop-filter: blur(15px);
@@ -487,7 +305,6 @@ st.markdown("""
         font-family: 'Roboto', sans-serif;
         font-weight: 600;
         font-size: clamp(1rem, 2vw, 1.2rem);
-        animation: messageSlide 0.6s ease-out;
         box-shadow: 0 8px 25px rgba(76, 175, 80, 0.15);
     }
     
@@ -502,22 +319,10 @@ st.markdown("""
         font-family: 'Roboto', sans-serif;
         font-weight: 600;
         font-size: clamp(1rem, 2vw, 1.2rem);
-        animation: messageSlide 0.6s ease-out;
         box-shadow: 0 8px 25px rgba(255, 87, 34, 0.15);
     }
     
-    @keyframes messageSlide {
-        from { transform: translateX(-50px); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    
-    /* Responsive Design Breakpoints */
-    @media (max-width: 1200px) {
-        .nav-header { padding: 1.5rem 2rem; }
-        .glass-card { margin: 1.5rem 0; }
-        .restaurant-card { margin: 1.5rem 0; }
-    }
-    
+    /* Responsive Design */
     @media (max-width: 768px) {
         .nav-header { 
             padding: 1.2rem 1.5rem; 
@@ -538,14 +343,6 @@ st.markdown("""
             min-height: 400px;
             border-radius: 20px;
         }
-        .booking-form {
-            padding: 1.5rem;
-            border-radius: 20px;
-        }
-        .metric-card {
-            padding: 1.5rem;
-            border-radius: 15px;
-        }
         .stChatMessage {
             margin: 0.5rem 0 !important;
             padding: 1rem !important;
@@ -559,97 +356,41 @@ st.markdown("""
         }
     }
     
-    @media (max-width: 480px) {
-        .nav-header { 
-            padding: 1rem; 
-            margin-bottom: 1.5rem;
-            border-radius: 20px;
-        }
-        .glass-card { 
-            padding: 1rem; 
-            margin: 0.8rem 0;
-            border-radius: 12px;
-        }
-        .restaurant-card { 
-            padding: 1rem; 
-            margin: 0.8rem 0;
-            border-radius: 12px;
-        }
-        .chat-container {
-            padding: 1rem;
-            min-height: 350px;
-            border-radius: 15px;
-        }
-        .booking-form {
-            padding: 1rem;
-            border-radius: 15px;
-        }
-        .metric-card {
-            padding: 1rem;
-            border-radius: 12px;
-        }
-        .stButton > button {
-            padding: 0.8rem 1.5rem;
-            font-size: 0.9rem;
-            border-radius: 10px;
-        }
-        .stChatMessage {
-            margin: 0.3rem 0 !important;
-            padding: 0.8rem !important;
-            border-radius: 10px !important;
-        }
-        .stChatMessage[data-testid="user-message"] {
-            margin-left: 2% !important;
-        }
-        .stChatMessage[data-testid="assistant-message"] {
-            margin-right: 2% !important;
-        }
+    /* Status indicators */
+    .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin: 0.5rem 0;
     }
     
-    /* Loading and Interaction States */
-    .loading-spinner {
-        display: inline-block;
-        width: 30px;
-        height: 30px;
-        border: 3px solid rgba(215, 53, 39, 0.3);
-        border-radius: 50%;
-        border-top-color: #d73527;
-        animation: enhancedSpin 1.2s ease-in-out infinite;
+    .status-online {
+        background: rgba(76, 175, 80, 0.2);
+        color: #2e7d32;
+        border: 1px solid rgba(76, 175, 80, 0.4);
     }
     
-    @keyframes enhancedSpin {
-        to { transform: rotate(360deg) scale(1.05); }
+    .status-offline {
+        background: rgba(244, 67, 54, 0.2);
+        color: #c62828;
+        border: 1px solid rgba(244, 67, 54, 0.4);
     }
     
-    /* Accessibility Improvements */
-    .stButton > button:focus,
-    .stTextInput > div > div > input:focus,
-    .stSelectbox > div > div > div:focus {
-        outline: 3px solid rgba(215, 53, 39, 0.5);
-        outline-offset: 2px;
-    }
-    
-    /* Dark mode support */
-    @media (prefers-color-scheme: dark) {
-        .glass-card {
-            background: rgba(40, 40, 40, 0.4);
-            border-color: rgba(215, 53, 39, 0.3);
-        }
-        .restaurant-card {
-            background: rgba(50, 50, 50, 0.4);
-            border-color: rgba(215, 53, 39, 0.3);
-        }
-        .chat-container {
-            background: rgba(45, 45, 45, 0.4);
-            border-color: rgba(215, 53, 39, 0.3);
-        }
+    .status-warning {
+        background: rgba(255, 152, 0, 0.2);
+        color: #ef6c00;
+        border: 1px solid rgba(255, 152, 0, 0.4);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Fixed session state initialization
+# Enhanced session state initialization with AI agent compatibility
 def initialize_session_state():
-    """Initialize session state with proper error handling"""
+    """Initialize session state with AI agent compatibility"""
     default_states = {
         'messages': [{"role": "assistant", "content": "Welcome to FoodieSpot! I'm your AI dining concierge ready to help you discover exceptional culinary experiences. What type of cuisine are you craving today?"}],
         'restaurants': [],
@@ -659,27 +400,45 @@ def initialize_session_state():
         'booking_data': {},
         'last_api_call': None,
         'last_cuisine_search': None,
-        'last_city_search': None
+        'last_city_search': None,
+        'ai_agent_ready': False,
+        'conversation_context': [],
+        'system_status': None,
+        'cached_restaurants': None
     }
     
     for key, default_value in default_states.items():
         if key not in st.session_state:
             st.session_state[key] = default_value
+    
+    # Check AI agent availability
+    try:
+        if ai_agent is not None:
+            st.session_state.ai_agent_ready = True
+            logger.info("AI agent is ready and connected to Supabase")
+        else:
+            st.session_state.ai_agent_ready = False
+            logger.warning("AI agent not available, using fallback mode")
+    except Exception as e:
+        st.session_state.ai_agent_ready = False
+        logger.error(f"Error checking AI agent: {e}")
 
-# FIXED: API functions with better error handling and timeout adjustments
+# Enhanced API functions with better error handling
 def make_api_request(endpoint, method="GET", data=None):
+    """Make API requests with enhanced error handling and caching"""
     try:
         url = f"{API_BASE_URL}/{endpoint}"
         logger.info(f"Making {method} request to {url}")
         
+        # Simple caching mechanism
         cache_key = f"{method}_{endpoint}_{str(data)}"
         if cache_key == st.session_state.get('last_api_call'):
             return st.session_state.get('last_api_result')
         
         if method == "GET":
-            response = requests.get(url, timeout=15)  # Increased timeout for Render
+            response = requests.get(url, timeout=15)
         elif method == "POST":
-            response = requests.post(url, json=data, timeout=15)  # Increased timeout for Render
+            response = requests.post(url, json=data, timeout=15)
         
         if response.status_code in [200, 201]:
             result = response.json()
@@ -687,81 +446,50 @@ def make_api_request(endpoint, method="GET", data=None):
             st.session_state['last_api_result'] = result
             return result
         else:
-            st.error(f"API Error: {response.status_code}")
+            logger.error(f"API Error: {response.status_code}")
             return None
             
     except requests.exceptions.ConnectionError:
-        st.error("Unable to connect to our reservation system. Please ensure the backend service is running at https://foodiespot-vzs5.onrender.com")
+        logger.error("Connection error to API")
         return None
     except requests.exceptions.Timeout:
-        st.error("Request timed out. The server might be starting up. Please try again in a moment.")
+        logger.error("API request timeout")
         return None
     except Exception as e:
-        st.error(f"Request failed: {str(e)}")
+        logger.error(f"API request failed: {str(e)}")
         return None
 
 def get_restaurants_from_api():
     """Get restaurants with caching"""
-    if 'cached_restaurants' not in st.session_state:
+    if st.session_state.cached_restaurants is None:
         result = make_api_request("restaurants")
         if result and result.get('success'):
-            st.session_state['cached_restaurants'] = result['data']
+            st.session_state.cached_restaurants = result['data']
             return result['data']
         return []
-    return st.session_state['cached_restaurants']
+    return st.session_state.cached_restaurants
 
-# Enhanced smart recommendations function
-def get_smart_recommendations_for_ui(session_preferences):
-    """Get smart recommendations for Streamlit UI"""
+# Enhanced AI agent processing with full Supabase integration
+def process_user_input_with_ai(user_input: str):
+    """Enhanced AI agent processing with Supabase integration"""
     try:
-        response = requests.post(
-            f"{API_BASE_URL}/recommendations/smart",
-            json=session_preferences,
-            timeout=15  # Increased timeout for Render
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            if result.get('success'):
-                return result['data'], result['meta']
-        return [], {"message": "No recommendations available"}
-    except Exception as e:
-        st.error(f"Error getting recommendations: {e}")
-        return [], {"message": "Service unavailable"}
-
-# Add smart recommendations function (backward compatibility)
-def get_smart_recommendations(preferences):
-    """Get smart recommendations from the recommendation engine"""
-    try:
-        response = requests.post(
-            f"{API_BASE_URL}/recommendations/smart",
-            json=preferences,
-            timeout=15  # Increased timeout for Render
-        )
-        
-        if response.status_code == 200:
-            return response.json()
-        return None
-    except Exception as e:
-        st.error(f"Error getting recommendations: {e}")
-        return None
-
-# Enhanced AI agent processing
-def process_user_input(user_input: str):
-    """Enhanced AI agent processing"""
-    try:
-        # Check if AI agent is available
-        if ai_agent is None:
+        if not st.session_state.ai_agent_ready or ai_agent is None:
             return handle_fallback_response(user_input)
         
-        # Use the AI agent instead of simple keyword matching
+        # Use the AI agent with full tool integration
         response = ai_agent.chat(user_input)
+        
+        # Update session state with any restaurant data from AI agent
+        if hasattr(ai_agent, 'last_search_results') and ai_agent.last_search_results:
+            st.session_state.restaurants = ai_agent.last_search_results[:10]
+        
         return response
+        
     except Exception as e:
         logger.error(f"AI agent error: {e}")
-        # Fallback to simple processing
         return handle_fallback_response(user_input)
 
+# Enhanced fallback response handler
 def handle_fallback_response(user_input):
     """Fallback response handler when AI agent fails"""
     user_input_lower = user_input.lower()
@@ -772,29 +500,13 @@ def handle_fallback_response(user_input):
         return "I'd be delighted to help you secure a table! Please navigate to our 'Reserve Table' section to complete your booking with our streamlined reservation system."
     elif any(word in user_input_lower for word in ['recommend', 'suggest', 'best']):
         return handle_recommendation_request(user_input)
+    elif any(word in user_input_lower for word in ['status', 'health', 'system']):
+        return check_system_status_text()
     else:
         return "I'm here to enhance your dining journey! I can help you discover exceptional restaurants, make seamless reservations, or provide personalized recommendations based on your preferences. What culinary adventure shall we plan today?"
 
-# Updated recommendation request handler
-def handle_recommendation_request(user_input):
-    """Use smart recommendation engine"""
-    preferences = {
-        'cuisine': st.session_state.get('last_cuisine_search'),
-        'city': st.session_state.get('last_city_search'),
-        'budget': 'moderate',
-        'min_rating': 4.0,
-        'party_size': 2
-    }
-    
-    restaurants, meta = get_smart_recommendations_for_ui(preferences)
-    
-    if restaurants:
-        st.session_state.restaurants = restaurants[:5]
-        return f"{meta['message']} (Response time: {meta.get('response_time', 0):.3f}s)"
-    else:
-        return "I'm having trouble generating recommendations right now. Please try browsing our restaurant collection."
-
 def handle_restaurant_search(user_input):
+    """Handle restaurant search with fallback"""
     cuisines = ['italian', 'mexican', 'chinese', 'japanese', 'french', 'indian', 'thai', 'american']
     found_cuisine = None
     
@@ -814,7 +526,97 @@ def handle_restaurant_search(user_input):
     
     return "I'd be happy to help you find the perfect restaurant! Try asking for specific cuisines like Italian, Japanese, French, or any other preference you have in mind. I can also help you filter by location, price range, or special dietary requirements."
 
-# Initialize session state at the start
+def handle_recommendation_request(user_input):
+    """Handle recommendation requests"""
+    try:
+        if st.session_state.ai_agent_ready and ai_agent:
+            # Use AI agent for recommendations
+            response = ai_agent.chat(f"Give me restaurant recommendations based on: {user_input}")
+            return response
+        else:
+            # Fallback to API recommendations
+            preferences = {
+                'cuisine': st.session_state.get('last_cuisine_search'),
+                'city': st.session_state.get('last_city_search'),
+                'min_rating': 4.0
+            }
+            
+            result = make_api_request("recommendations", "POST", preferences)
+            if result and result.get('success'):
+                restaurants = result['data'][:5]
+                st.session_state.restaurants = restaurants
+                return f"Here are my top recommendations based on your preferences! I found {len(restaurants)} excellent options for you."
+            else:
+                return "I'm having trouble generating recommendations right now. Please try browsing our restaurant collection."
+    except Exception as e:
+        logger.error(f"Recommendation error: {e}")
+        return "I'm having trouble generating recommendations right now. Please try browsing our restaurant collection."
+
+def check_system_status_text():
+    """Get system status as text"""
+    try:
+        status_info = {
+            'ai_agent_available': st.session_state.ai_agent_ready,
+            'api_available': False,
+            'database_available': False
+        }
+        
+        # Check API status
+        api_result = make_api_request("health")
+        if api_result:
+            status_info['api_available'] = True
+        
+        # Check AI agent status
+        if ai_agent:
+            ai_status = ai_agent.get_status()
+            status_info.update({
+                'database_available': ai_status.get('database_initialized', False),
+                'total_restaurants': ai_status.get('database_stats', {}).get('restaurants', 0),
+                'total_reservations': ai_status.get('database_stats', {}).get('reservations', 0)
+            })
+        
+        status_text = "🔍 **System Status:**\n\n"
+        status_text += f"• AI Agent: {'🟢 Online' if status_info['ai_agent_available'] else '🔴 Offline'}\n"
+        status_text += f"• API Service: {'🟢 Online' if status_info['api_available'] else '🔴 Offline'}\n"
+        status_text += f"• Database: {'🟢 Connected' if status_info['database_available'] else '🔴 Disconnected'}\n"
+        
+        if status_info.get('total_restaurants'):
+            status_text += f"• Restaurants: {status_info['total_restaurants']}\n"
+            status_text += f"• Reservations: {status_info['total_reservations']}\n"
+        
+        return status_text
+        
+    except Exception as e:
+        return f"Error checking system status: {str(e)}"
+
+# Enhanced reservation handling with AI agent
+def handle_reservation_with_ai(reservation_data):
+    """Handle reservations through AI agent with Supabase integration"""
+    try:
+        if st.session_state.ai_agent_ready and ai_agent:
+            # Format reservation request for AI agent
+            reservation_text = f"""
+            I want to make a reservation:
+            - Restaurant: {reservation_data['restaurant_name']}
+            - Customer: {reservation_data['customer_name']}
+            - Email: {reservation_data['customer_email']}
+            - Party size: {reservation_data['party_size']}
+            - Date: {reservation_data['reservation_date']}
+            - Time: {reservation_data['reservation_time']}
+            - Special requests: {reservation_data.get('special_requests', 'None')}
+            """
+            
+            response = ai_agent.chat(reservation_text)
+            return response
+        else:
+            # Fallback to direct API call
+            return make_api_request("reservations", "POST", reservation_data)
+            
+    except Exception as e:
+        logger.error(f"Reservation error: {e}")
+        return None
+
+# Initialize session state
 initialize_session_state()
 
 # Navigation Header
@@ -825,7 +627,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Fixed Navigation Tabs with proper state management
+# Navigation Tabs with proper state management
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
@@ -864,6 +666,12 @@ if st.session_state.current_page == "Home":
         </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    # System Status Display
+    if st.session_state.ai_agent_ready:
+        st.markdown('<div class="status-indicator status-online">🤖 AI Agent Online</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="status-indicator status-warning">⚠️ AI Agent Offline - Using Fallback Mode</div>', unsafe_allow_html=True)
     
     # Stats Section
     col1, col2, col3, col4 = st.columns(4)
@@ -944,33 +752,96 @@ if st.session_state.current_page == "Home":
 
 elif st.session_state.current_page == "Chat":
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-    st.markdown("### 🤖 Your Personal Dining Concierge")
-    st.markdown("*Ask me anything about restaurants, cuisines, reservations, or dining recommendations*")
     
-    # Display chat messages with enhanced styling
+    # Chat header with status
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        st.markdown("### 🤖 Your Personal Dining Concierge")
+        st.markdown("*Powered by AI with real-time restaurant data*")
+    
+    with col2:
+        if st.button("🔄 Check Status", key="status_check"):
+            status_text = check_system_status_text()
+            st.info(status_text)
+    
+    with col3:
+        if st.button("🗑️ Clear Chat", key="clear_chat"):
+            st.session_state.messages = [st.session_state.messages[0]]  # Keep welcome message
+            if ai_agent:
+                ai_agent.reset_conversation()
+            st.rerun()
+    
+    # Display system status
+    if st.session_state.ai_agent_ready:
+        st.success("🟢 AI Agent Connected to Supabase Database")
+    else:
+        st.warning("🟡 Using Fallback Mode - Limited functionality")
+    
+    # Display chat messages
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
     
-    # Enhanced chat input with better UX
-    if prompt := st.chat_input("Ask me about restaurants, cuisines, reservations, or get personalized recommendations..."):
+    # Enhanced chat input with suggestions
+    st.markdown("#### 💡 Try asking:")
+    suggestion_cols = st.columns(4)
+    
+    suggestions = [
+        "Find Italian restaurants in New York",
+        "Book a table for 2 tonight",
+        "Recommend romantic dinner spots",
+        "Show me budget-friendly options"
+    ]
+    
+    for i, suggestion in enumerate(suggestions):
+        with suggestion_cols[i]:
+            if st.button(suggestion, key=f"suggestion_{i}", use_container_width=True):
+                st.session_state.messages.append({"role": "user", "content": suggestion})
+                
+                with st.chat_message("assistant"):
+                    with st.spinner("🤖 Processing your request..."):
+                        response = process_user_input_with_ai(suggestion)
+                        st.markdown(response)
+                
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.rerun()
+    
+    # Main chat input
+    if prompt := st.chat_input("Ask me about restaurants, make reservations, or get personalized recommendations..."):
+        # Add user message
         st.session_state.messages.append({"role": "user", "content": prompt})
         
-        # Show typing indicator
+        # Process with AI agent
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                response = process_user_input(prompt)
+            with st.spinner("🤖 AI is analyzing your request..."):
+                response = process_user_input_with_ai(prompt)
+                st.markdown(response)
         
+        # Add assistant response
         st.session_state.messages.append({"role": "assistant", "content": response})
         st.rerun()
     
     st.markdown('</div>', unsafe_allow_html=True)
 
 elif st.session_state.current_page == "Booking":
-    st.markdown('<div class="booking-form">', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.markdown("### 📋 Reserve Your Perfect Table")
     
-    restaurants = get_restaurants_from_api()
+    # Get restaurants from AI agent or API
+    restaurants = []
+    if st.session_state.ai_agent_ready and ai_agent:
+        try:
+            # Use AI agent to get restaurants
+            ai_response = ai_agent.chat("Show me all available restaurants")
+            if hasattr(ai_agent, 'last_search_results'):
+                restaurants = ai_agent.last_search_results
+        except Exception as e:
+            logger.error(f"Error getting restaurants from AI: {e}")
+    
+    # Fallback to API
+    if not restaurants:
+        restaurants = get_restaurants_from_api()
+    
     restaurant_options = [r['name'] for r in restaurants] if restaurants else ["No restaurants available"]
     
     col1, col2 = st.columns(2)
@@ -1004,41 +875,97 @@ elif st.session_state.current_page == "Booking":
         key="special_requests"
     )
     
-    col1, col2, col3 = st.columns([1, 2, 1])
+    # Check availability and reservation buttons
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col1:
+        if st.button("🔍 Check Availability", use_container_width=True, key="check_availability"):
+            if selected_restaurant_name != "No restaurants available":
+                selected_restaurant = next((r for r in restaurants if r['name'] == selected_restaurant_name), None)
+                
+                if selected_restaurant and st.session_state.ai_agent_ready and ai_agent:
+                    # Use AI agent to check availability
+                    availability_query = f"Check availability for {selected_restaurant_name} on {reservation_date} at {reservation_time} for {party_size} people"
+                    response = ai_agent.chat(availability_query)
+                    st.info(response)
+                else:
+                    # Fallback to API
+                    availability_data = {
+                        "restaurant_id": selected_restaurant['id'],
+                        "date": reservation_date.isoformat(),
+                        "time": reservation_time.strftime("%H:%M"),
+                        "party_size": party_size
+                    }
+                    result = make_api_request("availability", "POST", availability_data)
+                    if result and result.get('success'):
+                        if result.get('available'):
+                            st.success(f"✅ Available! {result.get('available_seats', 0)} seats remaining")
+                        else:
+                            st.warning(f"❌ Not available. Only {result.get('available_seats', 0)} seats remaining")
+    
     with col2:
         if st.button("🎯 Confirm Reservation", use_container_width=True, key="confirm_reservation"):
-            if user_name and user_email and restaurants:
+            if user_name and user_email and restaurants and selected_restaurant_name != "No restaurants available":
                 selected_restaurant = next((r for r in restaurants if r['name'] == selected_restaurant_name), None)
                 
                 if selected_restaurant:
-                    with st.spinner("Processing your reservation..."):
-                        reservation_data = {
-                            "restaurant_id": selected_restaurant['id'],
-                            "user_name": user_name,
-                            "user_email": user_email,
-                            "party_size": party_size,
-                            "date": reservation_date.isoformat(),
-                            "time": reservation_time.strftime("%H:%M"),
-                            "special_requests": special_requests
-                        }
-                        
-                        result = make_api_request("reservations", "POST", reservation_data)
-                        
-                        if result and result.get('success'):
-                            st.markdown("""
-                            <div class="success-message">
-                                🎉 <strong>Reservation Confirmed!</strong><br>
-                                Your table has been successfully reserved. A confirmation email will be sent shortly.
-                            </div>
-                            """, unsafe_allow_html=True)
-                            st.balloons()
+                    reservation_data = {
+                        "restaurant_name": selected_restaurant['name'],
+                        "customer_name": user_name,
+                        "customer_email": user_email,
+                        "party_size": party_size,
+                        "reservation_date": reservation_date.isoformat(),
+                        "reservation_time": reservation_time.strftime("%H:%M"),
+                        "special_requests": special_requests
+                    }
+                    
+                    with st.spinner("🤖 AI is processing your reservation..."):
+                        if st.session_state.ai_agent_ready and ai_agent:
+                            # Use AI agent for reservation
+                            response = handle_reservation_with_ai(reservation_data)
+                            
+                            if "confirmed" in response.lower() or "success" in response.lower():
+                                st.markdown("""
+                                <div class="success-message">
+                                    🎉 <strong>Reservation Confirmed!</strong><br>
+                                    Your table has been successfully reserved. A confirmation email will be sent shortly.
+                                </div>
+                                """, unsafe_allow_html=True)
+                                st.balloons()
+                            else:
+                                st.markdown("""
+                                <div class="error-message">
+                                    ❌ <strong>Reservation Failed</strong><br>
+                                    We couldn't process your reservation. Please try again or contact us directly.
+                                </div>
+                                """, unsafe_allow_html=True)
                         else:
-                            st.markdown("""
-                            <div class="error-message">
-                                ❌ <strong>Reservation Failed</strong><br>
-                                We couldn't process your reservation. Please try again or contact us directly.
-                            </div>
-                            """, unsafe_allow_html=True)
+                            # Fallback to direct API
+                            api_reservation_data = {
+                                "restaurant_id": selected_restaurant['id'],
+                                "user_name": user_name,
+                                "user_email": user_email,
+                                "party_size": party_size,
+                                "date": reservation_date.isoformat(),
+                                "time": reservation_time.strftime("%H:%M"),
+                                "special_requests": special_requests
+                            }
+                            result = make_api_request("reservations", "POST", api_reservation_data)
+                            if result and result.get('success'):
+                                st.markdown("""
+                                <div class="success-message">
+                                    🎉 <strong>Reservation Confirmed!</strong><br>
+                                    Your table has been successfully reserved. A confirmation email will be sent shortly.
+                                </div>
+                                """, unsafe_allow_html=True)
+                                st.balloons()
+                            else:
+                                st.markdown("""
+                                <div class="error-message">
+                                    ❌ <strong>Reservation Failed</strong><br>
+                                    We couldn't process your reservation. Please try again or contact us directly.
+                                </div>
+                                """, unsafe_allow_html=True)
             else:
                 st.markdown("""
                 <div class="error-message">
@@ -1046,6 +973,14 @@ elif st.session_state.current_page == "Booking":
                     Please fill in all required fields to complete your reservation.
                 </div>
                 """, unsafe_allow_html=True)
+    
+    with col3:
+        if st.button("🤖 Ask AI for Help", use_container_width=True, key="ai_help"):
+            if st.session_state.ai_agent_ready and ai_agent:
+                help_response = ai_agent.chat("Help me make a reservation. What information do you need?")
+                st.info(help_response)
+            else:
+                st.info("AI assistant is not available. Please fill out the form manually.")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1067,7 +1002,7 @@ elif st.session_state.current_page == "Discover":
     with col4:
         city_filter = st.selectbox("📍 Location", ["All Cities", "New York", "Los Angeles", "Chicago", "San Francisco", "Miami"], key="city_filter")
     
-    # Smart Recommendations Button
+    # Search and AI Recommendations
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🔍 Search Restaurants", use_container_width=True, key="search_restaurants"):
@@ -1077,140 +1012,70 @@ elif st.session_state.current_page == "Discover":
                 st.session_state['last_cuisine_search'] = cuisine_filter
             if price_filter != "Any Budget":
                 params.append(f"price_range={price_filter}")
-            if rating_filter > 1.0:
-                params.append(f"min_rating={rating_filter}")
             if city_filter != "All Cities":
                 params.append(f"city={city_filter}")
                 st.session_state['last_city_search'] = city_filter
+            params.append(f"min_rating={rating_filter}")
             
-            endpoint = "restaurants"
-            if params:
-                endpoint += "?" + "&".join(params)
+            endpoint = f"restaurants?{'&'.join(params)}"
+            result = make_api_request(endpoint)
             
-            with st.spinner("Discovering restaurants..."):
-                result = make_api_request(endpoint)
-                if result and result.get('success'):
-                    st.session_state.restaurants = result['data']
-                    st.rerun()
+            if result and result.get('success'):
+                st.session_state.restaurants = result['data']
+                st.success(f"Found {len(result['data'])} restaurants matching your criteria!")
+            else:
+                st.error("No restaurants found with these filters")
     
     with col2:
-        if st.button("🎯 Smart Recommendations", use_container_width=True, key="smart_recommendations"):
-            with st.spinner("Getting personalized recommendations..."):
+        if st.button("🤖 Get AI Recommendations", use_container_width=True, key="ai_recommendations"):
+            if st.session_state.ai_agent_ready and ai_agent:
+                # Use AI agent for smart recommendations
                 preferences = {
                     'cuisine': cuisine_filter if cuisine_filter != "All Cuisines" else None,
+                    'price_range': price_filter if price_filter != "Any Budget" else None,
                     'city': city_filter if city_filter != "All Cities" else None,
-                    'budget': price_filter if price_filter != "Any Budget" else 'moderate',
-                    'min_rating': rating_filter,
-                    'party_size': 2
+                    'min_rating': rating_filter
                 }
                 
-                restaurants, meta = get_smart_recommendations_for_ui(preferences)
-                if restaurants:
-                    st.session_state.restaurants = restaurants
-                    st.success(f"Found {len(restaurants)} personalized recommendations!")
-                    st.rerun()
+                recommendation_query = f"Give me restaurant recommendations for {preferences}"
+                response = ai_agent.chat(recommendation_query)
+                st.info(response)
+                
+                if hasattr(ai_agent, 'last_search_results'):
+                    st.session_state.restaurants = ai_agent.last_search_results
+            else:
+                st.warning("AI recommendations not available. Using search instead.")
     
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    restaurants_to_show = st.session_state.restaurants if st.session_state.restaurants else get_restaurants_from_api()
-    
-    if restaurants_to_show:
-        st.markdown(f"### Found {len(restaurants_to_show)} Exceptional Restaurants")
+    # Display restaurants
+    if st.session_state.restaurants:
+        st.markdown("### 🍽️ Restaurant Results")
         
-        for i in range(0, len(restaurants_to_show), 3):
-            cols = st.columns(3)
-            for j, restaurant in enumerate(restaurants_to_show[i:i+3]):
-                with cols[j]:
-                    st.markdown(f"""
-                    <div class="restaurant-card">
-                        <div style="text-align: center; font-size: 3.5rem; margin-bottom: 1rem;">🍽️</div>
-                        <div class="restaurant-name">{restaurant['name']}</div>
-                        <div class="restaurant-details">
-                            <p><strong>Cuisine:</strong> {restaurant['cuisine']}</p>
-                            <p><strong>Rating:</strong> ⭐ {restaurant['rating']}/5</p>
-                            <p><strong>Price:</strong> {restaurant['price_range']}</p>
-                            <p><strong>Location:</strong> {restaurant['city']}</p>
-                            <p><strong>Capacity:</strong> {restaurant['capacity']} seats</p>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if st.button(f"Reserve Table", key=f"discover_book_{i}_{j}", use_container_width=True):
-                        st.session_state.selected_restaurant = restaurant
-                        st.session_state.current_page = "Booking"
-                        st.rerun()
-    else:
-        # Professional Empty State
-        st.markdown("""
-        <div class="glass-card">
-            <div class="empty-state-container" style="text-align: center; padding: 4rem 2rem;">
-                <div style="font-size: 4rem; margin-bottom: 1.5rem; opacity: 0.7;">🔍</div>
-                <h3 style="font-family: 'Playfair Display', serif; color: #8b5a3c; margin-bottom: 1rem;">
-                    Ready to Discover Your Perfect Dining Experience?
-                </h3>
-                <p style="color: rgba(139, 90, 60, 0.8); line-height: 1.6; max-width: 500px; margin-left: auto; margin-right: auto; margin-bottom: 2.5rem;">
-                    Use the filters above to find restaurants that match your preferences, or let our AI assistant guide you to the perfect meal.
-                </p>
-                <div style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;">
-                    <div style="text-align: center;">
-                        <div style="background: linear-gradient(135deg, rgba(215, 53, 39, 0.1), rgba(244, 162, 97, 0.1)); border: 2px solid rgba(215, 53, 39, 0.3); border-radius: 15px; padding: 1.5rem; margin-bottom: 1rem; min-width: 200px;">
-                            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🤖</div>
-                            <h4 style="color: #8b5a3c; margin-bottom: 0.5rem; font-family: 'Playfair Display', serif;">AI Assistant</h4>
-                            <p style="color: rgba(139, 90, 60, 0.7); font-size: 0.9rem;">Get personalized recommendations</p>
-                        </div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="background: linear-gradient(135deg, rgba(215, 53, 39, 0.1), rgba(244, 162, 97, 0.1)); border: 2px solid rgba(215, 53, 39, 0.3); border-radius: 15px; padding: 1.5rem; margin-bottom: 1rem; min-width: 200px;">
-                            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⭐</div>
-                            <h4 style="color: #8b5a3c; margin-bottom: 0.5rem; font-family: 'Playfair Display', serif;">Top Rated</h4>
-                            <p style="color: rgba(139, 90, 60, 0.7); font-size: 0.9rem;">Browse our highest-rated restaurants</p>
-                        </div>
-                    </div>
-                    <div style="text-align: center;">
-                        <div style="background: linear-gradient(135deg, rgba(215, 53, 39, 0.1), rgba(244, 162, 97, 0.1)); border: 2px solid rgba(215, 53, 39, 0.3); border-radius: 15px; padding: 1.5rem; margin-bottom: 1rem; min-width: 200px;">
-                            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🍽️</div>
-                            <h4 style="color: #8b5a3c; margin-bottom: 0.5rem; font-family: 'Playfair Display', serif;">All Cuisines</h4>
-                            <p style="color: rgba(139, 90, 60, 0.7); font-size: 0.9rem;">Explore our complete collection</p>
-                        </div>
-                    </div>
-                </div>
-                <div style="margin-top: 2rem;">
-                    <p style="color: rgba(139, 90, 60, 0.6); font-size: 1rem; font-style: italic;">
-                        💡 Tip: Try filtering by cuisine, price range, or location to find exactly what you're craving
-                    </p>
+        for restaurant in st.session_state.restaurants:
+            st.markdown(f"""
+            <div class="restaurant-card">
+                <div style="text-align: center; font-size: 3rem; margin-bottom: 1rem;">🍽️</div>
+                <div class="restaurant-name">{restaurant['name']}</div>
+                <div class="restaurant-details">
+                    <p><strong>Cuisine:</strong> {restaurant['cuisine']}</p>
+                    <p><strong>Rating:</strong> ⭐ {restaurant['rating']}/5</p>
+                    <p><strong>Price:</strong> {restaurant['price_range']}</p>
+                    <p><strong>Location:</strong> {restaurant['city']}</p>
+                    <p><strong>Phone:</strong> {restaurant.get('phone', 'N/A')}</p>
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Functional buttons
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("🤖 Ask AI Assistant", use_container_width=True, key="empty_ai"):
-                st.session_state.current_page = "Chat"
+            """, unsafe_allow_html=True)
+            
+            if st.button(f"Reserve at {restaurant['name']}", key=f"discover_book_{restaurant['id']}", use_container_width=True):
+                st.session_state.selected_restaurant = restaurant
+                st.session_state.current_page = "Booking"
                 st.rerun()
-        
-        with col2:
-            if st.button("⭐ View Top Rated", use_container_width=True, key="empty_top"):
-                result = make_api_request("recommendations")
-                if result and result.get('success'):
-                    st.session_state.restaurants = result['data']
-                    st.rerun()
-        
-        with col3:
-            if st.button("🍽️ Show All Restaurants", use_container_width=True, key="empty_all"):
-                restaurants = get_restaurants_from_api()
-                if restaurants:
-                    st.session_state.restaurants = restaurants
-                    st.rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer
 st.markdown("""
-<div class="glass-card" style="margin-top: 3rem;">
-    <div style="text-align: center; color: rgba(139, 90, 60, 0.7);">
-        <p style="margin: 0; font-weight: 600;">🍽️ FoodieSpot AI - Where Every Meal Becomes a Memory</p>
-        <p style="margin: 0.5rem 0 0 0;">© 2025 FoodieSpot Technologies | Premium Dining Experiences Powered by AI</p>
-    </div>
+<div style="text-align: center; margin-top: 3rem; padding: 2rem; color: rgba(139, 90, 60, 0.6);">
+    <p>© 2024 FoodieSpot - Premium AI-Powered Dining Experiences</p>
+    <p>Powered by Advanced AI Technology & Supabase Database</p>
 </div>
 """, unsafe_allow_html=True)
