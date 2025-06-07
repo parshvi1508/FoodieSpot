@@ -5,7 +5,8 @@ from datetime import datetime, date, timedelta
 import pandas as pd
 import logging
 from ai_agent import ai_agent
-
+import os
+from dotenv import load_dotenv
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -18,9 +19,10 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# FIXED: API Configuration for Render deployment
-API_BASE_URL = "https://foodiespot-vzs5.onrender.com/api"
+# Load environment variables
+load_dotenv()
 
+API_BASE_URL = os.getenv('API_BASE_URL', 'https://foodiespot-vzs5.onrender.com/api')
 # Enhanced Responsive CSS with Professional Food Theme
 st.markdown("""
 <style>
