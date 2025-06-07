@@ -751,31 +751,23 @@ if st.session_state.current_page == "Home":
         """, unsafe_allow_html=True)
 
 elif st.session_state.current_page == "Chat":
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     
     # Chat header with status
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col1, col2 = st.columns([2, 1])
     with col1:
         st.markdown("### 🤖 Your Personal Dining Concierge")
         st.markdown("*Powered by AI with real-time restaurant data*")
     
-    with col2:
-        if st.button("🔄 Check Status", key="status_check"):
-            status_text = check_system_status_text()
-            st.info(status_text)
     
-    with col3:
+    
+    with col2:
         if st.button("🗑️ Clear Chat", key="clear_chat"):
             st.session_state.messages = [st.session_state.messages[0]]  # Keep welcome message
             if ai_agent:
                 ai_agent.reset_conversation()
             st.rerun()
     
-    # Display system status
-    if st.session_state.ai_agent_ready:
-        st.success("🟢 AI Agent Connected to Supabase Database")
-    else:
-        st.warning("🟡 Using Fallback Mode - Limited functionality")
+    
     
     # Display chat messages
     for message in st.session_state.messages:
@@ -789,7 +781,7 @@ elif st.session_state.current_page == "Chat":
     suggestions = [
         "Find Italian restaurants in New York",
         "Book a table for 2 tonight",
-        "Recommend romantic dinner spots",
+        "Recommend dinner spots",
         "Show me budget-friendly options"
     ]
     
@@ -985,7 +977,6 @@ elif st.session_state.current_page == "Booking":
     st.markdown('</div>', unsafe_allow_html=True)
 
 elif st.session_state.current_page == "Discover":
-    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
     st.markdown("### 🔍 Discover Exceptional Restaurants")
     
     col1, col2, col3, col4 = st.columns(4)
