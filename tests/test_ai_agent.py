@@ -254,3 +254,40 @@ class TestRestaurantAI:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+            mock_query.execute.return_value = mock_result
+            mock_supabase_client.table.return_value.select.return_value = mock_query
+            
+            # Force API first mode
+            ai_agent_with_supabase.api_available = True
+            ai_agent_with_supabase.use_api_first = True
+            
+            result = ai_agent_with_supabase._call_api('restaurants', {}, method='GET')
+            
+            assert result['success'] is True
+            assert result['source'] == 'supabase'
+            assert len(result['data']) == 1
+
+        def test_get_status_with_supabase(self, ai_agent_with_supabase, mock_supabase_client):
+            """Test status retrieval with Supabase statistics"""
+            # Mock database statistics
+            mock_restaurants_count = MagicMock()
+            mock_restaurants_count.count = 150
+            
+            mock_reservations_count = MagicMock()
+            mock_reservations_count.count = 75
+            
+            def mock_table_side_effect(table_name):
+                mock_table = MagicMock()
+                if table_name == 'restaurants':
+                    mock_table.select.return_value.execute.return_value = mock_restaurants_count
+                elif table_name == 'reservations':
+                    mock_table.select.return_value.execute.return_value = mock_reservations_count
+                return mock_table
+            
+            mock_supabase_client.table.side_effect = mock_table_side_effect
+            
+            status = ai_agent_with_supabase.get_status()
+            
+            assert 'database_stats' in status
+            assert status['database_stats']['restaurants'] == 150
+            assert status['database_stats']['reservations'] == 75
