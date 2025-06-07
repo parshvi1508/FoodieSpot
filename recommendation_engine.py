@@ -1,272 +1,325 @@
 import time
 import logging
-from typing import List, Dict, Any, Optional
-from datetime import datetime, date
-import requests
+from typing import Dict, List, Optional, Any
+from supabase import create_client
+import os
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class RecommendationEngine:
-    def __init__(self, api_base_url="http://localhost:5000/api"):
-        self.api_base_url = api_base_url
-        
-        # Weight factors for scoring
-        self.weights = {
-            'rating': 2.0,
-            'location_match': 3.0,
-            'price_match': 1.5,
-            'cuisine_match': 2.5,
-            'availability': 4.0
-        }
+    """
+    Smart recommendation engine for FoodieSpot using only free resources.
+    Provides intelligent restaurant recommendations based on user preferences,
+    availability, and sophisticated scoring algorithms.
+    """
     
-    def _fetch_restaurants(self, filters: Dict = None) -> List[Dict]:
-        """Fetch restaurants from API with optional filters"""
+    def __init__(self):
+        """Initialize the recommendation engine with Supabase connection."""
         try:
-            params = {}
-            if filters:
-                if filters.get('cuisine'):
-                    params['cuisine'] = filters['cuisine']
-                if filters.get('city'):
-                    params['city'] = filters['city']
-                if filters.get('price_range'):
-                    params['price_range'] = filters['price_range']
-                if filters.get('min_rating'):
-                    params['min_rating'] = filters['min_rating']
-            
-            endpoint = "restaurants"
-            if params:
-                param_str = "&".join([f"{k}={v}" for k, v in params.items()])
-                endpoint += f"?{param_str}"
-            
-            response = requests.get(f"{self.api_base_url}/{endpoint}", timeout=5)
-            if response.status_code == 200:
-                return response.json().get('data', [])
-            return []
-        except Exception as e:
-            logger.error(f"Error fetching restaurants: {e}")
-            return []
-    
-    def _check_availability(self, restaurant_id: str, date_str: str, time_str: str, party_size: int) -> bool:
-        """Check if restaurant has availability"""
-        try:
-            data = {
-                "restaurant_id": restaurant_id,
-                "date": date_str,
-                "time": time_str,
-                "party_size": party_size
-            }
-            response = requests.post(f"{self.api_base_url}/availability", json=data, timeout=3)
-            if response.status_code == 200:
-                result = response.json()
-                return result.get('data', {}).get('available', False)
-            return False
-        except Exception as e:
-            logger.error(f"Error checking availability for restaurant {restaurant_id}: {e}")
-            return False
-    
-    def cuisine_based_matching(self, restaurants: List[Dict], preferred_cuisine: str) -> List[Dict]:
-        """Filter and score restaurants by cuisine preference"""
-        if not preferred_cuisine:
-            return restaurants
-        
-        matched = []
-        for restaurant in restaurants:
-            if restaurant['cuisine'].lower() == preferred_cuisine.lower():
-                matched.append(restaurant)
-        
-        # Sort by rating within cuisine
-        matched.sort(key=lambda x: x['rating'], reverse=True)
-        return matched
-    
-    def location_proximity_scoring(self, restaurants: List[Dict], preferred_city: str) -> List[Dict]:
-        """Score restaurants based on location proximity"""
-        if not preferred_city:
-            return restaurants
-        
-        scored_restaurants = []
-        for restaurant in restaurants:
-            proximity_score = 1.0 if restaurant['city'].lower() == preferred_city.lower() else 0.3
-            restaurant['proximity_score'] = proximity_score
-            scored_restaurants.append(restaurant)
-        
-        return scored_restaurants
-    
-    def price_range_filtering(self, restaurants: List[Dict], budget_preference: str) -> List[Dict]:
-        """Filter restaurants by price range with budget mapping"""
-        budget_map = {
-            'low': '$',
-            'moderate': '$$',
-            'high': '$$$',
-            'luxury': '$$$$'
-        }
-        
-        target_price = budget_map.get(budget_preference, budget_preference)
-        
-        if not target_price:
-            return restaurants
-        
-        # Exact match first, then adjacent ranges
-        exact_match = [r for r in restaurants if r['price_range'] == target_price]
-        
-        # If no exact matches, include adjacent price ranges
-        if not exact_match:
-            price_order = ['$', '$$', '$$$', '$$$$']
-            try:
-                target_idx = price_order.index(target_price)
-                adjacent_ranges = []
-                if target_idx > 0:
-                    adjacent_ranges.append(price_order[target_idx - 1])
-                if target_idx < len(price_order) - 1:
-                    adjacent_ranges.append(price_order[target_idx + 1])
-                
-                adjacent_match = [r for r in restaurants if r['price_range'] in adjacent_ranges]
-                return adjacent_match
-            except ValueError:
-                return restaurants
-        
-        return exact_match
-    
-    def availability_based_fallbacks(self, restaurants: List[Dict], session_preferences: Dict) -> Dict:
-        """Handle fully booked scenarios with intelligent fallbacks"""
-        available_restaurants = []
-        unavailable_restaurants = []
-        
-        # Check availability for each restaurant
-        date_str = session_preferences.get('date', date.today().isoformat())
-        time_str = session_preferences.get('time', '19:00')
-        party_size = session_preferences.get('party_size', 2)
-        
-        for restaurant in restaurants:
-            is_available = self._check_availability(
-                restaurant['id'], date_str, time_str, party_size
+            self.supabase = create_client(
+                os.getenv("SUPABASE_URL"), 
+                os.getenv("SUPABASE_ANON_KEY")
             )
-            
-            if is_available:
-                available_restaurants.append(restaurant)
-            else:
-                unavailable_restaurants.append(restaurant)
-        
-        # Fallback strategies
-        fallback_used = False
-        recommendations = available_restaurants
-        
-        if not available_restaurants:
-            fallback_used = True
-            # Strategy 1: Suggest alternative times (mock implementation)
-            recommendations = unavailable_restaurants[:5]
-            
-        elif len(available_restaurants) < 3:
-            # Strategy 2: Mix available with highly-rated unavailable
-            fallback_used = True
-            top_unavailable = sorted(unavailable_restaurants, key=lambda x: x['rating'], reverse=True)[:2]
-            recommendations = available_restaurants + top_unavailable
-        
-        return {
-            'restaurants': recommendations,
-            'fallback_used': fallback_used,
-            'available_count': len(available_restaurants),
-            'total_count': len(restaurants)
-        }
+            logger.info("Recommendation engine initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize recommendation engine: {e}")
+            raise
     
-    def calculate_recommendation_score(self, restaurant: Dict, preferences: Dict) -> float:
-        """Calculate comprehensive recommendation score"""
-        score = 0.0
+    def get_recommendations(self, preferences: Dict[str, Any], limit: int = 10) -> Dict[str, Any]:
+        """
+        Get intelligent restaurant recommendations based on user preferences.
         
-        # Base rating score
-        score += restaurant['rating'] * self.weights['rating']
-        
-        # Location proximity score
-        if preferences.get('city'):
-            proximity = restaurant.get('proximity_score', 0)
-            score += proximity * self.weights['location_match']
-        
-        # Price range match
-        if preferences.get('price_range') and restaurant['price_range'] == preferences['price_range']:
-            score += self.weights['price_match']
-        
-        # Cuisine match
-        if preferences.get('cuisine') and restaurant['cuisine'].lower() == preferences['cuisine'].lower():
-            score += self.weights['cuisine_match']
-        
-        # Availability bonus (if checked)
-        if restaurant.get('is_available', True):
-            score += self.weights['availability']
-        
-        return score
-    
-    def get_recommendations(self, session_preferences: Dict, limit: int = 10) -> Dict:
-        """Main recommendation function with <1s response time"""
+        Args:
+            preferences: Dictionary containing user preferences
+            limit: Maximum number of recommendations to return
+            
+        Returns:
+            Dictionary containing recommendations and metadata
+        """
         start_time = time.time()
         
         try:
-            # Step 1: Fetch restaurants with basic filters
-            restaurants = self._fetch_restaurants(session_preferences)
+            # Build base query
+            query = self.supabase.table('restaurants').select('*')
+            
+            # Apply filters based on preferences
+            query = self._apply_filters(query, preferences)
+            
+            # Execute query with ordering
+            result = query.order('rating', desc=True).limit(limit * 2).execute()
+            restaurants = result.data
             
             if not restaurants:
+                # Fallback strategy
+                return self._get_fallback_recommendations(preferences, limit, start_time)
+            
+            # Score and rank restaurants
+            scored_restaurants = self._score_restaurants(restaurants, preferences)
+            
+            # Select top recommendations
+            top_recommendations = scored_restaurants[:limit]
+            
+            response_time = time.time() - start_time
+            
+            return {
+                'recommendations': top_recommendations,
+                'fallback_used': False,
+                'total_count': len(restaurants),
+                'response_time': response_time,
+                'message': self._generate_message(preferences, len(top_recommendations))
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in get_recommendations: {e}")
+            return self._get_fallback_recommendations(preferences, limit, start_time)
+    
+    def _apply_filters(self, query, preferences: Dict[str, Any]):
+        """Apply user preference filters to the query."""
+        
+        # Cuisine filter with fuzzy matching
+        if preferences.get('cuisine'):
+            cuisine = preferences['cuisine']
+            query = query.ilike('cuisine', f"%{cuisine}%")
+            logger.debug(f"Applied cuisine filter: {cuisine}")
+        
+        # Location filter with city matching
+        if preferences.get('city'):
+            city = preferences['city']
+            query = query.ilike('city', f"%{city}%")
+            logger.debug(f"Applied city filter: {city}")
+        
+        # Price range filter with flexibility
+        if preferences.get('price_range'):
+            price_range = preferences['price_range']
+            query = query.eq('price_range', price_range)
+            logger.debug(f"Applied price_range filter: {price_range}")
+        
+        # Rating filter
+        if preferences.get('min_rating'):
+            min_rating = float(preferences['min_rating'])
+            query = query.gte('rating', min_rating)
+            logger.debug(f"Applied min_rating filter: {min_rating}")
+        
+        return query
+    
+    def _score_restaurants(self, restaurants: List[Dict], preferences: Dict[str, Any]) -> List[Dict]:
+        """
+        Score restaurants based on multiple factors and user preferences.
+        
+        Args:
+            restaurants: List of restaurant data
+            preferences: User preferences for scoring
+            
+        Returns:
+            List of restaurants sorted by score (highest first)
+        """
+        scored_restaurants = []
+        
+        for restaurant in restaurants:
+            score = self._calculate_restaurant_score(restaurant, preferences)
+            restaurant['recommendation_score'] = score
+            scored_restaurants.append(restaurant)
+        
+        # Sort by score (highest first)
+        scored_restaurants.sort(key=lambda x: x['recommendation_score'], reverse=True)
+        
+        return scored_restaurants
+    
+    def _calculate_restaurant_score(self, restaurant: Dict, preferences: Dict[str, Any]) -> float:
+        """
+        Calculate a comprehensive score for a restaurant based on multiple factors.
+        
+        Scoring factors:
+        - Rating (40% weight)
+        - Cuisine match (25% weight)
+        - Price preference (20% weight)
+        - Capacity/availability (15% weight)
+        """
+        score = 0.0
+        
+        # Rating score (40% weight) - normalized to 0-40
+        rating = float(restaurant.get('rating', 0))
+        score += (rating / 5.0) * 40
+        
+        # Cuisine match score (25% weight)
+        if preferences.get('cuisine'):
+            preferred_cuisine = preferences['cuisine'].lower()
+            restaurant_cuisine = restaurant.get('cuisine', '').lower()
+            
+            if preferred_cuisine in restaurant_cuisine or restaurant_cuisine in preferred_cuisine:
+                score += 25  # Perfect match
+            elif self._is_related_cuisine(preferred_cuisine, restaurant_cuisine):
+                score += 15  # Related cuisine
+        else:
+            score += 12.5  # Neutral score when no preference
+        
+        # Price preference score (20% weight)
+        if preferences.get('price_range'):
+            preferred_price = preferences['price_range']
+            restaurant_price = restaurant.get('price_range', '')
+            
+            if preferred_price == restaurant_price:
+                score += 20  # Perfect match
+            elif self._is_acceptable_price_range(preferred_price, restaurant_price):
+                score += 10  # Acceptable range
+        else:
+            score += 10  # Neutral score when no preference
+        
+        # Capacity score (15% weight) - favor restaurants with good capacity
+        capacity = restaurant.get('capacity', 0)
+        if capacity >= 100:
+            score += 15  # Large capacity
+        elif capacity >= 50:
+            score += 12  # Medium capacity
+        elif capacity >= 20:
+            score += 8   # Small capacity
+        else:
+            score += 5   # Very small capacity
+        
+        return round(score, 2)
+    
+    def _is_related_cuisine(self, cuisine1: str, cuisine2: str) -> bool:
+        """Check if two cuisines are related."""
+        related_cuisines = {
+            'italian': ['mediterranean', 'european'],
+            'french': ['european', 'mediterranean'],
+            'chinese': ['asian', 'japanese', 'thai'],
+            'japanese': ['asian', 'chinese', 'thai'],
+            'thai': ['asian', 'chinese', 'japanese'],
+            'indian': ['asian', 'thai'],
+            'mexican': ['american', 'latin'],
+            'american': ['mexican', 'latin']
+        }
+        
+        return cuisine2 in related_cuisines.get(cuisine1, [])
+    
+    def _is_acceptable_price_range(self, preferred: str, restaurant: str) -> bool:
+        """Check if restaurant price range is acceptable based on preference."""
+        price_levels = {'$': 1, '$$': 2, '$$$': 3, '$$$$': 4}
+        
+        preferred_level = price_levels.get(preferred, 2)
+        restaurant_level = price_levels.get(restaurant, 2)
+        
+        # Accept within 1 level difference
+        return abs(preferred_level - restaurant_level) <= 1
+    
+    def _get_fallback_recommendations(self, preferences: Dict[str, Any], limit: int, start_time: float) -> Dict[str, Any]:
+        """
+        Provide fallback recommendations when primary search fails.
+        
+        Fallback strategies:
+        1. Remove strict filters and try broader search
+        2. Get highly rated restaurants regardless of preferences
+        3. Get random sample if all else fails
+        """
+        logger.info("Using fallback recommendation strategy")
+        
+        try:
+            # Strategy 1: Broader search with relaxed filters
+            query = self.supabase.table('restaurants').select('*')
+            
+            # Only apply rating filter if specified
+            if preferences.get('min_rating'):
+                min_rating = max(3.0, float(preferences['min_rating']) - 1.0)  # Relax by 1 star
+                query = query.gte('rating', min_rating)
+            else:
+                query = query.gte('rating', 3.5)  # Default to good restaurants
+            
+            result = query.order('rating', desc=True).limit(limit).execute()
+            
+            if result.data:
                 response_time = time.time() - start_time
                 return {
-                    'recommendations': [],
-                    'fallback_used': False,
+                    'recommendations': result.data,
+                    'fallback_used': True,
+                    'total_count': len(result.data),
                     'response_time': response_time,
-                    'message': 'No restaurants found'
+                    'message': self._generate_fallback_message(preferences)
                 }
             
-            # Step 2: Apply cuisine-based matching
-            if session_preferences.get('cuisine'):
-                restaurants = self.cuisine_based_matching(restaurants, session_preferences['cuisine'])
-            
-            # Step 3: Apply location proximity scoring
-            if session_preferences.get('city'):
-                restaurants = self.location_proximity_scoring(restaurants, session_preferences['city'])
-            
-            # Step 4: Apply price range filtering
-            if session_preferences.get('budget') or session_preferences.get('price_range'):
-                budget = session_preferences.get('budget') or session_preferences.get('price_range')
-                restaurants = self.price_range_filtering(restaurants, budget)
-            
-            # Step 5: Check availability and apply fallbacks
-            availability_result = self.availability_based_fallbacks(restaurants, session_preferences)
-            restaurants = availability_result['restaurants']
-            
-            # Step 6: Calculate final scores and sort
-            for restaurant in restaurants:
-                restaurant['recommendation_score'] = self.calculate_recommendation_score(restaurant, session_preferences)
-            
-            restaurants.sort(key=lambda x: x['recommendation_score'], reverse=True)
-            
-            # Step 7: Limit results
-            recommendations = restaurants[:limit]
+            # Strategy 2: Get any restaurants if nothing found
+            result = self.supabase.table('restaurants').select('*').limit(limit).execute()
             
             response_time = time.time() - start_time
-            
             return {
-                'recommendations': recommendations,
-                'fallback_used': availability_result['fallback_used'],
-                'available_count': availability_result['available_count'],
-                'total_count': availability_result['total_count'],
+                'recommendations': result.data,
+                'fallback_used': True,
+                'total_count': len(result.data),
                 'response_time': response_time,
-                'message': self._generate_recommendation_message(availability_result, len(recommendations))
+                'message': "Here are some popular restaurants you might enjoy"
             }
-        
+            
         except Exception as e:
+            logger.error(f"Fallback strategy failed: {e}")
             response_time = time.time() - start_time
-            logger.error(f"Error generating recommendations: {e}")
             return {
                 'recommendations': [],
-                'fallback_used': False,
+                'fallback_used': True,
+                'total_count': 0,
                 'response_time': response_time,
-                'message': 'Error generating recommendations'
+                'message': "Unable to load recommendations at this time"
             }
     
-    def _generate_recommendation_message(self, availability_result: Dict, rec_count: int) -> str:
-        """Generate user-friendly recommendation message"""
-        if availability_result['fallback_used']:
-            if availability_result['available_count'] == 0:
-                return f"Found {rec_count} highly-rated restaurants. Some may be fully booked - we suggest calling ahead or trying different times."
-            else:
-                return f"Found {rec_count} restaurants including {availability_result['available_count']} with immediate availability."
+    def _generate_message(self, preferences: Dict[str, Any], count: int) -> str:
+        """Generate a personalized message based on preferences and results."""
+        if count == 0:
+            return "No restaurants found matching your criteria"
+        
+        parts = []
+        
+        if preferences.get('cuisine'):
+            parts.append(f"{preferences['cuisine']} cuisine")
+        
+        if preferences.get('city'):
+            parts.append(f"in {preferences['city']}")
+        
+        if preferences.get('price_range'):
+            parts.append(f"in the {preferences['price_range']} price range")
+        
+        if preferences.get('min_rating'):
+            parts.append(f"with {preferences['min_rating']}+ star rating")
+        
+        if parts:
+            criteria = ", ".join(parts)
+            return f"Found {count} excellent restaurants for {criteria}"
         else:
-            return f"Found {rec_count} available restaurants matching your preferences."
+            return f"Here are {count} top-rated restaurants for you"
+    
+    def _generate_fallback_message(self, preferences: Dict[str, Any]) -> str:
+        """Generate message for fallback recommendations."""
+        if preferences.get('cuisine'):
+            return f"We couldn't find exact matches for {preferences['cuisine']} cuisine, but here are some highly-rated alternatives"
+        elif preferences.get('city'):
+            return f"Here are some top restaurants, including options near {preferences['city']}"
+        else:
+            return "Here are some highly-rated restaurants you might enjoy"
+    
+    def get_cuisine_recommendations(self, cuisine: str, limit: int = 5) -> List[Dict]:
+        """Get recommendations for a specific cuisine."""
+        preferences = {'cuisine': cuisine, 'min_rating': 4.0}
+        result = self.get_recommendations(preferences, limit)
+        return result['recommendations']
+    
+    def get_location_recommendations(self, city: str, limit: int = 5) -> List[Dict]:
+        """Get recommendations for a specific location."""
+        preferences = {'city': city, 'min_rating': 4.0}
+        result = self.get_recommendations(preferences, limit)
+        return result['recommendations']
+    
+    def get_price_range_recommendations(self, price_range: str, limit: int = 5) -> List[Dict]:
+        """Get recommendations for a specific price range."""
+        preferences = {'price_range': price_range, 'min_rating': 3.5}
+        result = self.get_recommendations(preferences, limit)
+        return result['recommendations']
 
-# Initialize recommendation engine
+# Create singleton instance
 recommendation_engine = RecommendationEngine()
+
+# Export for use in other modules
+__all__ = ['recommendation_engine', 'RecommendationEngine']

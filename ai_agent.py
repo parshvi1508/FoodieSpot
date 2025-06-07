@@ -1,28 +1,120 @@
 import os
 import json
+import logging
 import requests
+from typing import Dict, List, Optional, Any
 from together import Together
 from dotenv import load_dotenv
 
+# Load environment variables
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 class RestaurantAI:
-    def __init__(self):
-        self.client = Together(api_key=os.getenv('TOGETHER_API_KEY', 'test_key'))
-        self.context = []
-        self.tools = [
+    """
+    AI Agent for restaurant search, availability checking, and reservation management.
+    Uses Together AI for natural language processing and Flask API for data operations.
+    """
+    
+    def __init__(self, api_base_url: Optional[str] = None):
+        """
+        Initialize the Restaurant AI agent.
+        
+        Args:
+            api_base_url: Base URL for the Flask API. Defaults to environment variable or production URL.
+        """
+        # Validate API key
+        api_key = os.getenv('TOGETHER_API_KEY')
+        if not api_key:
+            raise ValueError("TOGETHER_API_KEY environment variable is required")
+        
+        self.client = Together(api_key=api_key)
+        self.context: List[Dict[str, Any]] = []
+        self.last_search_results: List[Dict[str, Any]] = []
+        
+        # FIXED: Use production URL for Render deployment
+        self.api_base = api_base_url or os.getenv('API_BASE_URL', 'https://foodiespot-vzs5.onrender.com/api')
+        
+        # System prompt for better AI behavior
+        self.system_prompt = {
+            "role": "system",
+            "content": """You are a helpful restaurant assistant. You can:
+            1. Search for restaurants based on cuisine, location, price range, and ratings
+            2. Check availability for specific dates and times
+            3. Make reservations for customers
+            4. Provide smart recommendations based on user preferences
+            
+            Always be polite, helpful, and ask for clarification when needed.
+            When making reservations, ensure you have all required information: restaurant, name, email, party size, date, and time."""
+        }
+        self.context.append(self.system_prompt)
+        
+        # Define available tools
+        self.tools = self._initialize_tools()
+    
+    def _initialize_tools(self) -> List[Dict[str, Any]]:
+        """Initialize the available tools for the AI agent."""
+        return [
             {
                 "type": "function",
                 "function": {
                     "name": "search_restaurants",
-                    "description": "Search restaurants by filters",
+                    "description": "Search for restaurants based on various criteria",
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "cuisine": {"type": "string"},
-                            "location": {"type": "string"},
-                            "price_range": {"type": "string", "enum": ["$", "$$", "$$$", "$$$$"]},
-                            "min_rating": {"type": "number", "minimum": 1, "maximum": 5}
+                            "cuisine": {
+                                "type": "string",
+                                "description": "Type of cuisine (e.g., Italian, Chinese, Mexican)"
+                            },
+                            "location": {
+                                "type": "string",
+                                "description": "Location or area to search in"
+                            },
+                            "price_range": {
+                                "type": "string",
+                                "enum": ["$", "$$", "$$$", "$$$$"],
+                                "description": "Price range from $ (budget) to $$$$ (luxury)"
+                            },
+                            "min_rating": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 5,
+                                "description": "Minimum rating (1-5 stars)"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "check_availability",
+                    "description": "Check if a restaurant has availability for a specific date and time",
+                    "parameters": {
+                        "type": "object",
+                        "required": ["restaurant_id", "date", "time", "party_size"],
+                        "properties": {
+                            "restaurant_id": {
+                                "type": "string",
+                                "description": "Unique identifier for the restaurant"
+                            },
+                            "date": {
+                                "type": "string",
+                                "description": "Reservation date in YYYY-MM-DD format"
+                            },
+                            "time": {
+                                "type": "string",
+                                "description": "Reservation time in HH:MM format (24-hour)"
+                            },
+                            "party_size": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "description": "Number of people in the party"
+                            }
                         }
                     }
                 }
@@ -31,67 +123,316 @@ class RestaurantAI:
                 "type": "function",
                 "function": {
                     "name": "create_reservation",
-                    "description": "Create restaurant reservation",
+                    "description": "Create a reservation at a restaurant",
                     "parameters": {
                         "type": "object",
-                        "required": ["restaurant_id", "user_name", "user_email", "party_size", "datetime"],
+                        "required": ["restaurant_id", "customer_name", "customer_email", "party_size", "reservation_date", "reservation_time"],
                         "properties": {
-                            "restaurant_id": {"type": "string"},
-                            "user_name": {"type": "string"},
-                            "user_email": {"type": "string", "format": "email"},
-                            "party_size": {"type": "integer", "minimum": 1},
-                            "datetime": {"type": "string", "format": "date-time"},
-                            "special_requests": {"type": "string"}
+                            "restaurant_id": {
+                                "type": "string",
+                                "description": "Unique identifier for the restaurant"
+                            },
+                            "customer_name": {
+                                "type": "string",
+                                "description": "Full name of the customer making the reservation"
+                            },
+                            "customer_email": {
+                                "type": "string",
+                                "format": "email",
+                                "description": "Email address of the customer"
+                            },
+                            "party_size": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "description": "Number of people in the party"
+                            },
+                            "reservation_date": {
+                                "type": "string",
+                                "description": "Reservation date in YYYY-MM-DD format"
+                            },
+                            "reservation_time": {
+                                "type": "string",
+                                "description": "Reservation time in HH:MM format (24-hour)"
+                            },
+                            "special_requests": {
+                                "type": "string",
+                                "description": "Any special requests or dietary requirements"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_recommendations",
+                    "description": "Get smart restaurant recommendations based on user preferences",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "cuisine": {
+                                "type": "string",
+                                "description": "Preferred cuisine type"
+                            },
+                            "city": {
+                                "type": "string", 
+                                "description": "Preferred location/city"
+                            },
+                            "budget": {
+                                "type": "string",
+                                "enum": ["budget", "moderate", "upscale", "luxury"],
+                                "description": "Budget preference"
+                            },
+                            "price_range": {
+                                "type": "string",
+                                "enum": ["$", "$$", "$$$", "$$$$"],
+                                "description": "Price range preference"
+                            },
+                            "min_rating": {
+                                "type": "number",
+                                "minimum": 1,
+                                "maximum": 5,
+                                "description": "Minimum rating requirement"
+                            },
+                            "party_size": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "description": "Number of people"
+                            }
                         }
                     }
                 }
             }
         ]
-
-    def _call_api(self, endpoint: str, params: dict):
-        """Call Flask API endpoints"""
+    
+    def _call_api(self, endpoint: str, params: Dict[str, Any], method: str = "POST") -> Optional[Dict[str, Any]]:
+        """
+        Make API calls to the Flask backend with proper error handling.
+        
+        Args:
+            endpoint: API endpoint to call
+            params: Parameters to send with the request
+            method: HTTP method (GET or POST)
+            
+        Returns:
+            API response data or None if failed
+        """
         try:
-            response = requests.post(
-                f"http://localhost:5000/api/{endpoint}",
-                json=params,
-                timeout=10
-            )
-            return response.json() if response.status_code in [200, 201] else None
-        except Exception as e:
-            print(f"API Error: {str(e)}")
+            url = f"{self.api_base}/{endpoint}"
+            logger.info(f"Making {method} request to: {url}")
+            logger.debug(f"Parameters: {params}")
+            
+            if method == "GET":
+                # For GET requests, convert params to query string
+                if params:
+                    query_params = "&".join([f"{k}={v}" for k, v in params.items() if v is not None])
+                    if query_params:
+                        url += f"?{query_params}"
+                response = requests.get(url, timeout=30)
+            else:
+                response = requests.post(
+                    url, 
+                    json=params, 
+                    timeout=30,
+                    headers={'Content-Type': 'application/json'}
+                )
+            
+            if response.status_code in [200, 201]:
+                return response.json()
+            else:
+                logger.error(f"API Error: {response.status_code} - {response.text}")
+                return None
+                
+        except requests.exceptions.Timeout:
+            logger.error("API request timed out")
             return None
-
-    def _process_tool(self, tool_name: str, parameters: dict) -> str:
-        """Execute tool calls"""
-        if tool_name == "search_restaurants":
-            results = self._call_api("restaurants", parameters)
-            if results and 'data' in results:
-                restaurant_names = [r['name'] for r in results['data'][:3]]
-                return f"Found {len(results['data'])} restaurants: {', '.join(restaurant_names)}"
-            return "No restaurants found"
+        except requests.exceptions.ConnectionError:
+            logger.error("Failed to connect to API")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected API error: {str(e)}")
+            return None
+    
+    def _process_tool_search_restaurants(self, parameters: Dict[str, Any]) -> str:
+        """Process restaurant search tool call."""
+        # FIXED: Use the correct endpoint that exists in Flask app
+        search_params = {}
+        if parameters.get('cuisine'):
+            search_params['cuisine'] = parameters['cuisine']
+        if parameters.get('location'):
+            search_params['city'] = parameters['location']  # Map location to city
+        if parameters.get('price_range'):
+            search_params['price_range'] = parameters['price_range']
+        if parameters.get('min_rating'):
+            search_params['min_rating'] = parameters['min_rating']
         
-        if tool_name == "create_reservation":
-            result = self._call_api("reservations", parameters)
-            if result and 'data' in result:
-                return f"Reservation confirmed: {result['data']['id']}"
-            elif result and 'id' in result:
-                return f"Reservation confirmed: {result['id']}"
-            return "Reservation failed"
+        # Use GET method for restaurant search
+        result = self._call_api("restaurants", search_params, method="GET")
         
-        return "Unknown tool"
+        if result and result.get('success'):
+            restaurants = result['data'][:5]  # Show top 5
+            if restaurants:
+                self.last_search_results = restaurants
+                restaurant_info = []
+                
+                for restaurant in restaurants:
+                    name = restaurant.get('name', 'Unknown')
+                    cuisine = restaurant.get('cuisine', 'N/A')
+                    rating = restaurant.get('rating', 'N/A')
+                    price = restaurant.get('price_range', 'N/A')
+                    city = restaurant.get('city', 'N/A')
+                    restaurant_info.append(f"• {name} ({cuisine}, {rating}⭐, {price}) - {city}")
+                
+                return f"Found {len(restaurants)} restaurants:\n" + "\n".join(restaurant_info)
+        
+        return "No restaurants found matching your criteria. Try different search terms or browse our full collection."
+    
+    def _process_tool_check_availability(self, parameters: Dict[str, Any]) -> str:
+        """Process availability check tool call."""
+        result = self._call_api("availability", parameters)
+        
+        if result and result.get('success'):
+            restaurant_name = result.get('restaurant_name', 'the restaurant')
+            available_seats = result.get('available_seats', 0)
+            
+            if result.get('available'):
+                return f"✅ {restaurant_name} is available! {available_seats} seats remaining for your requested time."
+            else:
+                return f"❌ {restaurant_name} is not available for your requested time. Only {available_seats} seats remaining."
+        
+        return "Unable to check availability. Please try again or contact the restaurant directly."
+    
+    def _process_tool_create_reservation(self, parameters: Dict[str, Any]) -> str:
+        """Process reservation creation tool call."""
+        # Debug logging
+        logger.info(f"Creating reservation with parameters: {parameters}")
+    
+        # Map parameters to match Flask API expectations exactly
+        reservation_data = {
+            "restaurant_id": parameters.get('restaurant_id'),
+            "user_name": parameters.get('customer_name'),  # Note: customer_name -> user_name
+            "user_email": parameters.get('customer_email'), # Note: customer_email -> user_email
+            "party_size": parameters.get('party_size'),
+            "date": parameters.get('reservation_date'),     # Note: reservation_date -> date
+            "time": parameters.get('reservation_time'),     # Note: reservation_time -> time
+            "special_requests": parameters.get('special_requests', '')
+        }
 
+        # Validation
+        required_fields = ['restaurant_id', 'user_name', 'user_email', 'party_size', 'date', 'time']
+        missing_fields = [field for field in required_fields if not reservation_data.get(field)]
+
+        if missing_fields:
+            return f"Missing required information: {', '.join(missing_fields)}. Please provide all details."
+
+        logger.info(f"Sending reservation data to API: {reservation_data}")
+        result = self._call_api("reservations", reservation_data)
+
+        if result and result.get('success'):
+            reservation = result.get('reservation') or result.get('data')
+        if reservation:
+            return f"🎉 Reservation confirmed!\n" \
+                   f"Reservation ID: {reservation.get('id')}\n" \
+                   f"Restaurant: {reservation.get('restaurant_name', 'Unknown')}\n" \
+                   f"Date: {reservation_data['date']} at {reservation_data['time']}\n" \
+                   f"Party size: {reservation_data['party_size']}\n" \
+                   f"Confirmation email will be sent to {reservation_data['user_email']}"
+    
+    # error handling
+        error_msg = result.get('error', 'Unknown error') if result else 'API connection failed'
+        logger.error(f"Reservation creation failed: {error_msg}")
+        return f"❌ Reservation failed: {error_msg}. Please try again or contact support."
+
+    def _process_tool_get_recommendations(self, parameters: Dict[str, Any]) -> str:
+        """Process smart recommendations tool call."""
+        logger.info(f"Getting recommendations with parameters: {parameters}")
+        
+        result = self._call_api("recommendations/smart", parameters, method="POST")
+        logger.info(f"API result: {result}")
+        
+        if result and result.get('success'):
+            recommendations = result['data'][:5]
+            meta = result.get('meta', {})
+            
+            if recommendations:
+                restaurant_info = []
+                for restaurant in recommendations:
+                    name = restaurant.get('name', 'Unknown')
+                    cuisine = restaurant.get('cuisine', 'N/A')
+                    rating = restaurant.get('rating', 'N/A')
+                    price = restaurant.get('price_range', 'N/A')
+                    restaurant_info.append(f"• {name} ({cuisine}, {rating}⭐, {price})")
+                
+                message = meta.get('message', 'Found great recommendations')
+                return f"{message}\n\n" + "\n".join(restaurant_info)
+        
+        logger.warning("No recommendations found or API call failed")
+        return "I couldn't generate recommendations right now. Please try browsing our restaurant collection."
+    
+    def _process_tool(self, tool_name: str, parameters: Dict[str, Any]) -> str:
+        """
+        Execute tool calls with proper error handling and logging.
+        
+        Args:
+            tool_name: Name of the tool to execute
+            parameters: Parameters for the tool
+            
+        Returns:
+            Result of the tool execution
+        """
+        logger.info(f"Processing tool: {tool_name}")
+        logger.debug(f"Parameters: {parameters}")
+        
+        try:
+            if tool_name == "search_restaurants":
+                return self._process_tool_search_restaurants(parameters)
+            
+            elif tool_name == "check_availability":
+                return self._process_tool_check_availability(parameters)
+            
+            elif tool_name == "create_reservation":
+                return self._process_tool_create_reservation(parameters)
+            
+            elif tool_name == "get_recommendations":  # FIXED: Added this line
+                return self._process_tool_get_recommendations(parameters)
+            
+            else:
+                logger.warning(f"Unknown tool: {tool_name}")
+                return f"Unknown tool: {tool_name}"
+                
+        except Exception as e:
+            logger.error(f"Error processing tool {tool_name}: {str(e)}")
+            return f"Error executing {tool_name}. Please try again."
+    
     def chat(self, user_input: str) -> str:
-        """Process chat with AI agent"""
+        """
+        Process user input and generate AI response with tool calls.
+        
+        Args:
+            user_input: User's message
+            
+        Returns:
+            AI agent's response
+        """
+        if not user_input.strip():
+            return "Please provide a message. How can I help you with restaurants today?"
+        
         # Add user message to context
-        user_message = {"role": "user", "content": user_input}
+        user_message = {"role": "user", "content": user_input.strip()}
         self.context.append(user_message)
         
+        # Keep context manageable (last 15 messages to stay within free tier limits)
+        if len(self.context) > 15:
+            self.context = [self.system_prompt] + self.context[-14:]
+        
         try:
+            # Get AI response
             response = self.client.chat.completions.create(
                 model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
                 messages=self.context,
                 tools=self.tools,
-                temperature=0.7
+                temperature=0.7,
+                max_tokens=800  # Reduced for free tier efficiency
             )
             
             msg = response.choices[0].message
@@ -99,48 +440,93 @@ class RestaurantAI:
             # Add assistant message to context
             assistant_message = {
                 "role": "assistant", 
-                "content": msg.content,
-                "tool_calls": msg.tool_calls if hasattr(msg, 'tool_calls') else None
+                "content": msg.content or "",
+                "tool_calls": getattr(msg, 'tool_calls', None)
             }
             self.context.append(assistant_message)
             
             # Process tool calls if any
-            if msg.tool_calls:
-                for tool in msg.tool_calls:
-                    result = self._process_tool(
-                        tool.function.name,
-                        json.loads(tool.function.arguments)
-                    )
-                    # Add tool result to context
-                    tool_message = {
-                        "role": "tool",
-                        "content": result,
-                        "tool_call_id": tool.id
-                    }
-                    self.context.append(tool_message)
+            if hasattr(msg, 'tool_calls') and msg.tool_calls:
+                tool_results = []
+                
+                for tool_call in msg.tool_calls:
+                    try:
+                        # Parse tool parameters
+                        parameters = json.loads(tool_call.function.arguments)
+                        
+                        # Execute tool
+                        result = self._process_tool(tool_call.function.name, parameters)
+                        tool_results.append(result)
+                        
+                        # Add tool result to context
+                        tool_message = {
+                            "role": "tool",
+                            "content": result,
+                            "tool_call_id": tool_call.id
+                        }
+                        self.context.append(tool_message)
+                        
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON parsing error for tool call: {e}")
+                        error_result = "Error parsing tool parameters"
+                        tool_results.append(error_result)
+                        
+                        tool_message = {
+                            "role": "tool",
+                            "content": error_result,
+                            "tool_call_id": tool_call.id
+                        }
+                        self.context.append(tool_message)
                 
                 # Get final response with tool results
-                final_response = self.client.chat.completions.create(
-                    model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-                    messages=self.context,
-                    temperature=0.7
-                )
-                
-                final_msg = final_response.choices[0].message
-                final_assistant_message = {
-                    "role": "assistant",
-                    "content": final_msg.content
-                }
-                self.context.append(final_assistant_message)
-                
-                return final_msg.content
+                try:
+                    final_response = self.client.chat.completions.create(
+                        model="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+                        messages=self.context,
+                        temperature=0.7,
+                        max_tokens=600
+                    )
+                    
+                    final_msg = final_response.choices[0].message
+                    final_content = final_msg.content or "I've processed your request."
+                    
+                    # Add final response to context
+                    final_assistant_message = {
+                        "role": "assistant",
+                        "content": final_content
+                    }
+                    self.context.append(final_assistant_message)
+                    
+                    return final_content
+                    
+                except Exception as e:
+                    logger.error(f"Error getting final response: {e}")
+                    return "I've completed your request, but had trouble generating a final response."
             
-            return msg.content
+            return msg.content or "I'm here to help with restaurants. What would you like to know?"
             
         except Exception as e:
-            error_msg = f"Sorry, I encountered an error: {str(e)}"
+            logger.error(f"Chat processing error: {str(e)}")
+            error_msg = "I'm having trouble processing your request right now. Please try again in a moment."
+            
+            # Add error message to context
             self.context.append({"role": "assistant", "content": error_msg})
             return error_msg
+    
+    def reset_conversation(self):
+        """Reset the conversation context."""
+        self.context = [self.system_prompt]
+        self.last_search_results = []
+        logger.info("Conversation context reset")
+    
+    def get_conversation_history(self) -> List[Dict[str, Any]]:
+        """Get the current conversation history."""
+        return [msg for msg in self.context if msg["role"] != "system"]
 
 # Initialize singleton agent
-ai_agent = RestaurantAI()
+try:
+    ai_agent = RestaurantAI()
+    logger.info("Restaurant AI agent initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize Restaurant AI agent: {e}")
+    ai_agent = None
