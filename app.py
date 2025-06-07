@@ -1,12 +1,11 @@
 import logging
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template_string
 from flask_cors import CORS
 from supabase import create_client
 from pydantic import BaseModel, field_validator, ValidationError, EmailStr
 from datetime import datetime, date
 import os
 from dotenv import load_dotenv
-# Add to app.py
 from recommendation_engine import recommendation_engine
 
 # Configure logging
@@ -19,7 +18,15 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+
+# Enhanced CORS configuration for Render deployment
+CORS(app, origins=[
+    "https://foodiespot-vzs5.onrender.com",
+    "http://localhost:8501",
+    "http://localhost:5000",
+    "http://127.0.0.1:8501",
+    "http://127.0.0.1:5000"
+], supports_credentials=True)
 
 # Initialize Supabase client
 try:
@@ -54,6 +61,68 @@ class ReservationRequest(AvailabilityRequest):
     user_email: EmailStr
     user_name: str
 
+# ROOT ROUTE - FIXES 404 ERROR
+@app.route('/')
+def home():
+    """Root route to fix 404 deployment error"""
+    # Try to serve HTML template first
+    try:
+        html_template = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>FoodieSpot API</title>
+            <style>
+                body { font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #d73527, #e76f51); color: white; text-align: center; padding: 2rem; }
+                .container { max-width: 800px; margin: 0 auto; background: rgba(255,255,255,0.1); padding: 3rem; border-radius: 20px; backdrop-filter: blur(10px); }
+                h1 { font-size: 3rem; margin-bottom: 1rem; }
+                .status { background: rgba(76, 175, 80, 0.3); padding: 1rem; border-radius: 10px; margin: 2rem 0; }
+                .endpoints { text-align: left; background: rgba(255,255,255,0.1); padding: 2rem; border-radius: 10px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🍽️ FoodieSpot API</h1>
+                <div class="status">
+                    <h2>✅ API is Running Successfully</h2>
+                    <p>Version 1.0.0 | Deployed on Render</p>
+                </div>
+                <div class="endpoints">
+                    <h3>Available Endpoints:</h3>
+                    <ul>
+                        <li><strong>GET /api/health</strong> - Health check</li>
+                        <li><strong>GET /api/restaurants</strong> - Get restaurants with filters</li>
+                        <li><strong>GET /api/recommendations</strong> - Get recommendations</li>
+                        <li><strong>POST /api/recommendations/smart</strong> - Smart recommendations</li>
+                        <li><strong>POST /api/availability</strong> - Check availability</li>
+                        <li><strong>POST /api/reservations</strong> - Create reservation</li>
+                    </ul>
+                </div>
+                <p>Connect your Streamlit frontend to start using the FoodieSpot platform!</p>
+            </div>
+        </body>
+        </html>
+        """
+        return render_template_string(html_template)
+    except Exception:
+        # Fallback to JSON response
+        return jsonify({
+            'success': True,
+            'message': 'FoodieSpot API is running',
+            'version': '1.0.0',
+            'deployment': 'render',
+            'endpoints': {
+                'health': '/api/health',
+                'restaurants': '/api/restaurants',
+                'recommendations': '/api/recommendations',
+                'smart_recommendations': '/api/recommendations/smart',
+                'availability': '/api/availability',
+                'reservations': '/api/reservations'
+            }
+        })
+
 # Health check endpoint
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -61,7 +130,8 @@ def health_check():
     return jsonify({
         'success': True,
         'message': 'FoodieSpot API is running',
-        'timestamp': datetime.now().isoformat()
+        'timestamp': datetime.now().isoformat(),
+        'deployment': 'render'
     })
 
 # Get restaurants with filters
@@ -123,6 +193,93 @@ def get_restaurants():
             'success': False,
             'error': 'Failed to retrieve restaurants',
             'debug_info': str(e) if app.debug else None
+        }), 500
+
+# FIXED: Add recommendations endpoint that AI agent expects
+@app.route('/api/recommendations', methods=['GET', 'POST'])
+def get_recommendations():
+    logger.info(f"{request.method} /api/recommendations called")
+    
+    try:
+        if request.method == 'POST':
+            # Handle POST requests from AI agent
+            preferences = request.get_json() or {}
+        else:
+            # Handle GET requests with query parameters
+            preferences = {
+                'cuisine': request.args.get('cuisine'),
+                'city': request.args.get('city'),
+                'price_range': request.args.get('price_range'),
+                'min_rating': float(request.args.get('min_rating', 4.0))
+            }
+            # Remove None values
+            preferences = {k: v for k, v in preferences.items() if v is not None}
+        
+        # Use recommendation engine
+        result = recommendation_engine.get_recommendations(preferences, limit=10)
+        
+        return jsonify({
+            'success': True,
+            'recommendations': result['recommendations'],
+            'data': result['recommendations'],  # For backward compatibility
+            'count': len(result['recommendations']),
+            'meta': {
+                'fallback_used': result['fallback_used'],
+                'response_time': result['response_time'],
+                'message': result['message']
+            }
+        })
+    
+    except Exception as e:
+        logger.error(f"Error retrieving recommendations: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to retrieve recommendations',
+            'debug_info': str(e) if app.debug else None
+        }), 500
+
+# Smart recommendations endpoint
+@app.route('/api/recommendations/smart', methods=['POST'])
+def get_smart_recommendations():
+    """Get intelligent recommendations based on session preferences"""
+    try:
+        preferences = request.get_json() or {}
+        
+        # Extract session preferences
+        session_prefs = {
+            'cuisine': preferences.get('cuisine'),
+            'city': preferences.get('city'),
+            'budget': preferences.get('budget'),
+            'price_range': preferences.get('price_range'),
+            'min_rating': preferences.get('min_rating', 4.0),
+            'date': preferences.get('date'),
+            'time': preferences.get('time'),
+            'party_size': preferences.get('party_size', 2)
+        }
+        
+        # Remove None values
+        session_prefs = {k: v for k, v in session_prefs.items() if v is not None}
+        
+        # Get recommendations
+        result = recommendation_engine.get_recommendations(session_prefs, limit=10)
+        
+        return jsonify({
+            'success': True,
+            'data': result['recommendations'],
+            'meta': {
+                'fallback_used': result['fallback_used'],
+                'available_count': result.get('available_count', 0),
+                'total_count': result.get('total_count', 0),
+                'response_time': result['response_time'],
+                'message': result['message']
+            }
+        })
+    
+    except Exception as e:
+        logger.error(f"Error in smart recommendations: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to generate recommendations'
         }), 500
 
 # Check availability
@@ -190,6 +347,9 @@ def check_availability():
         
         return jsonify({
             'success': True,
+            'available': is_available,
+            'restaurant_name': restaurant['name'],
+            'available_seats': available_capacity,
             'data': {
                 'available': is_available,
                 'capacity': restaurant['capacity'],
@@ -284,11 +444,15 @@ def create_reservation():
         result = supabase.table('reservations').insert(reservation_data).execute()
         
         if result.data:
+            reservation = result.data[0]
+            reservation['restaurant_name'] = restaurant['name']
+            
             logger.info(f"Reservation created successfully for {data.user_name} at {restaurant['name']}")
             return jsonify({
                 'success': True,
                 'message': 'Reservation created successfully',
-                'data': result.data[0]
+                'reservation': reservation,
+                'data': reservation
             }), 201
         else:
             logger.error("Reservation creation failed - no data returned")
@@ -305,113 +469,21 @@ def create_reservation():
             'debug_info': str(e) if app.debug else None
         }), 500
 
-# Get recommendations
-
-@app.route('/api/recommendations/smart', methods=['POST'])
-def get_smart_recommendations():
-    """Get intelligent recommendations based on session preferences"""
-    try:
-        preferences = request.get_json() or {}
-        
-        # Extract session preferences
-        session_prefs = {
-            'cuisine': preferences.get('cuisine'),
-            'city': preferences.get('city'),
-            'budget': preferences.get('budget'),
-            'price_range': preferences.get('price_range'),
-            'min_rating': preferences.get('min_rating', 4.0),
-            'date': preferences.get('date'),
-            'time': preferences.get('time'),
-            'party_size': preferences.get('party_size', 2)
-        }
-        
-        # Remove None values
-        session_prefs = {k: v for k, v in session_prefs.items() if v is not None}
-        
-        # Get recommendations
-        result = recommendation_engine.get_recommendations(session_prefs, limit=10)
-        
-        return jsonify({
-            'success': True,
-            'data': result['recommendations'],
-            'meta': {
-                'fallback_used': result['fallback_used'],
-                'available_count': result.get('available_count', 0),
-                'total_count': result.get('total_count', 0),
-                'response_time': result['response_time'],
-                'message': result['message']
-            }
-        })
-    
-    except Exception as e:
-        logger.error(f"Error in smart recommendations: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Failed to generate recommendations'
-        }), 500
-
-@app.route('/api/recommendations', methods=['GET'])
-def get_recommendations():
-    logger.info(f"GET /api/recommendations called with args: {request.args}")
-    
-    try:
-        query = supabase.table('restaurants').select('*')
-        filters_applied = {}
-        
-        # Apply filters if provided
-        if 'cuisine' in request.args:
-            cuisine = request.args['cuisine']
-            query = query.ilike('cuisine', f"%{cuisine}%")
-            filters_applied['cuisine'] = cuisine
-        
-        if 'city' in request.args:
-            city = request.args['city']
-            query = query.ilike('city', f"%{city}%")
-            filters_applied['city'] = city
-        
-        if 'budget' in request.args:
-            budget_map = {
-                'low': '$',
-                'moderate': '$$',
-                'high': '$$$',
-                'luxury': '$$$$'
-            }
-            budget = request.args['budget']
-            price_range = budget_map.get(budget)
-            if price_range:
-                query = query.eq('price_range', price_range)
-                filters_applied['budget'] = budget
-                filters_applied['price_range'] = price_range
-            else:
-                logger.warning(f"Invalid budget parameter: {budget}")
-        
-        # Get top-rated restaurants
-        result = query.order('rating', desc=True).limit(10).execute()
-        
-        logger.info(f"Retrieved {len(result.data)} recommendations with filters: {filters_applied}")
-        
-        return jsonify({
-            'success': True,
-            'data': result.data,
-            'count': len(result.data),
-            'filters_applied': filters_applied
-        })
-    
-    except Exception as e:
-        logger.error(f"Error retrieving recommendations: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': 'Failed to retrieve recommendations',
-            'debug_info': str(e) if app.debug else None
-        }), 500
-
 # Error handlers
 @app.errorhandler(404)
 def not_found(error):
     logger.warning(f"404 error: {request.url}")
     return jsonify({
         'success': False,
-        'error': 'Endpoint not found'
+        'error': 'Endpoint not found',
+        'available_endpoints': [
+            '/api/health',
+            '/api/restaurants',
+            '/api/recommendations',
+            '/api/recommendations/smart',
+            '/api/availability',
+            '/api/reservations'
+        ]
     }), 404
 
 @app.errorhandler(500)

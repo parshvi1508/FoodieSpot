@@ -18,8 +18,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# API Configuration
-API_BASE_URL = "http://localhost:5000/api"
+# FIXED: API Configuration for Render deployment
+API_BASE_URL = "https://foodiespot-vzs5.onrender.com/api"
 
 # Enhanced Responsive CSS with Professional Food Theme
 st.markdown("""
@@ -664,7 +664,7 @@ def initialize_session_state():
         if key not in st.session_state:
             st.session_state[key] = default_value
 
-# API functions with better error handling
+# FIXED: API functions with better error handling and timeout adjustments
 def make_api_request(endpoint, method="GET", data=None):
     try:
         url = f"{API_BASE_URL}/{endpoint}"
@@ -675,9 +675,9 @@ def make_api_request(endpoint, method="GET", data=None):
             return st.session_state.get('last_api_result')
         
         if method == "GET":
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=15)  # Increased timeout for Render
         elif method == "POST":
-            response = requests.post(url, json=data, timeout=10)
+            response = requests.post(url, json=data, timeout=15)  # Increased timeout for Render
         
         if response.status_code in [200, 201]:
             result = response.json()
@@ -689,7 +689,10 @@ def make_api_request(endpoint, method="GET", data=None):
             return None
             
     except requests.exceptions.ConnectionError:
-        st.error("Unable to connect to our reservation system. Please ensure the backend service is running.")
+        st.error("Unable to connect to our reservation system. Please ensure the backend service is running at https://foodiespot-vzs5.onrender.com")
+        return None
+    except requests.exceptions.Timeout:
+        st.error("Request timed out. The server might be starting up. Please try again in a moment.")
         return None
     except Exception as e:
         st.error(f"Request failed: {str(e)}")
@@ -712,7 +715,7 @@ def get_smart_recommendations_for_ui(session_preferences):
         response = requests.post(
             f"{API_BASE_URL}/recommendations/smart",
             json=session_preferences,
-            timeout=10
+            timeout=15  # Increased timeout for Render
         )
         
         if response.status_code == 200:
@@ -731,7 +734,7 @@ def get_smart_recommendations(preferences):
         response = requests.post(
             f"{API_BASE_URL}/recommendations/smart",
             json=preferences,
-            timeout=10
+            timeout=15  # Increased timeout for Render
         )
         
         if response.status_code == 200:
@@ -745,6 +748,10 @@ def get_smart_recommendations(preferences):
 def process_user_input(user_input: str):
     """Enhanced AI agent processing"""
     try:
+        # Check if AI agent is available
+        if ai_agent is None:
+            return handle_fallback_response(user_input)
+        
         # Use the AI agent instead of simple keyword matching
         response = ai_agent.chat(user_input)
         return response
@@ -1008,8 +1015,8 @@ elif st.session_state.current_page == "Booking":
                             "user_name": user_name,
                             "user_email": user_email,
                             "party_size": party_size,
-                            "reservation_date": reservation_date.isoformat(),
-                            "reservation_time": reservation_time.strftime("%H:%M"),
+                            "date": reservation_date.isoformat(),
+                            "time": reservation_time.strftime("%H:%M"),
                             "special_requests": special_requests
                         }
                         
