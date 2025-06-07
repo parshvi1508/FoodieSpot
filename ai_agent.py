@@ -41,28 +41,28 @@ class RestaurantAI:
         # System prompt for better AI behavior
         self.system_prompt = {
             "role": "system",
-            "content": """You are a helpful restaurant assistant. You can:
+            "content": """You are FoodieSpot AI, a restaurant reservation assistant. You can:
             1. Search for restaurants based on cuisine, location, price range, and ratings
             2. Check availability for specific dates and times
             3. Make reservations for customers
             4. Provide smart recommendations based on user preferences
-            You are FoodieSpot AI, a restaurant reservation assistant.
-               CRITICAL: When a user wants to make a reservation, you MUST use the create_reservation tool.
-                Do NOT just respond conversationally about reservations.
+            
+            CRITICAL: When a user wants to make a reservation, you MUST use the create_reservation tool.
+            Do NOT just respond conversationally about reservations.
 
-                If a user provides reservation details, immediately call the create_reservation tool with the provided information.
+            If a user provides reservation details, immediately call the create_reservation tool with the provided information.
 
-                Required fields for reservations:
-                - restaurant_id (get from restaurant name)
-                - customer_name
-                - customer_email  
-                - party_size
-                - reservation_date (YYYY-MM-DD format)
-                - reservation_time (HH:MM format)
-                - special_requests (optional)
-                If any required information is missing, ask for it before proceeding.
-                Always be polite, helpful, and ask for clarification when needed.
-                When making reservations, ensure you have all required information: restaurant, name, email, party size, date, and time."""
+            Required fields for reservations:
+            - restaurant_name (name of the restaurant)
+            - customer_name
+            - customer_email  
+            - party_size
+            - reservation_date (YYYY-MM-DD format)
+            - reservation_time (HH:MM format)
+            - special_requests (optional)
+            
+            If any required information is missing, ask for it before proceeding.
+            Always be polite, helpful, and ask for clarification when needed."""
         }
         self.context.append(self.system_prompt)
         
@@ -103,48 +103,48 @@ class RestaurantAI:
                     }
                 }
             },
-            {
-                "type": "function",
-                "function": {
-                    "name": "check_availability",
-                    "description": "Check if a restaurant has availability for a specific date and time",
-                    "parameters": {
-                        "type": "object",
-                        "required": ["restaurant_id", "date", "time", "party_size"],
-                        "properties": {
-                            "restaurant_id": {
-                                "type": "string",
-                                "description": "Unique identifier for the restaurant"
-                            },
-                            "date": {
-                                "type": "string",
-                                "description": "Reservation date in YYYY-MM-DD format"
-                            },
-                            "time": {
-                                "type": "string",
-                                "description": "Reservation time in HH:MM format (24-hour)"
-                            },
-                            "party_size": {
-                                "type": "integer",
-                                "minimum": 1,
-                                "description": "Number of people in the party"
-                            }
-                        }
-                    }
+{
+    "type": "function",
+    "function": {
+        "name": "check_availability",
+        "description": "Check if a restaurant has availability for a specific date and time",
+        "parameters": {
+            "type": "object",
+            "required": ["restaurant_name", "date", "time", "party_size"],
+            "properties": {
+                "restaurant_name": {
+                    "type": "string",
+                    "description": "Name of the restaurant (e.g., 'Bangkok Street', 'Amalfi Coast Cafe')"
+                },
+                "date": {
+                    "type": "string",
+                    "description": "Reservation date in YYYY-MM-DD format"
+                },
+                "time": {
+                    "type": "string",
+                    "description": "Reservation time in HH:MM format (24-hour)"
+                },
+                "party_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Number of people in the party"
                 }
-            },
+            }
+        }
+    }
+},
             {
                 "type": "function",
                 "function": {
                     "name": "create_reservation",
-                    "description": "Create a reservation at a restaurant",
+                    "description": "Create a new restaurant reservation",
                     "parameters": {
                         "type": "object",
-                        "required": ["restaurant_id", "customer_name", "customer_email", "party_size", "reservation_date", "reservation_time"],
+                        "required": ["restaurant_name", "customer_name", "customer_email", "party_size", "reservation_date", "reservation_time"],
                         "properties": {
-                            "restaurant_id": {
+                            "restaurant_name": {
                                 "type": "string",
-                                "description": "Unique identifier for the restaurant"
+                                "description": "Name of the restaurant (e.g., 'Bangkok Street', 'Amalfi Coast Cafe')"
                             },
                             "customer_name": {
                                 "type": "string",
@@ -269,7 +269,6 @@ class RestaurantAI:
     
     def _process_tool_search_restaurants(self, parameters: Dict[str, Any]) -> str:
         """Process restaurant search tool call."""
-        # FIXED: Use the correct endpoint that exists in Flask app
         search_params = {}
         if parameters.get('cuisine'):
             search_params['cuisine'] = parameters['cuisine']
@@ -317,55 +316,75 @@ class RestaurantAI:
         return "Unable to check availability. Please try again or contact the restaurant directly."
     
     def _process_tool_create_reservation(self, parameters: Dict[str, Any]) -> str:
+        """Handle reservation creation with restaurant name lookup"""
         logger.info(f"Raw parameters received: {parameters}")
-    
-    # Get restaurant ID by name if needed
-        restaurant_id = parameters.get('restaurant_id')
-        if not restaurant_id:
-            restaurant_name = parameters.get('restaurant_name')
-            if restaurant_name:
+        
+        # Parse parameters if they're in string format
+        if isinstance(parameters, str):
+            try:
+                parameters = json.loads(parameters)
+            except:
+                pass
+        
+        # Get restaurant ID by name
+        restaurant_name = parameters.get('restaurant_name', parameters.get('restaurant_id', ''))
+        restaurant_id = None
+        
+        if restaurant_name:
+            try:
+                # Look up actual restaurant ID
                 restaurants_result = self._call_api("restaurants", {}, method="GET")
                 if restaurants_result and restaurants_result.get('data'):
                     restaurant = next((r for r in restaurants_result['data'] 
-                                    if r['name'].lower() == restaurant_name.lower()), None)
+                                     if r['name'].lower() == restaurant_name.lower()), None)
                     if restaurant:
                         restaurant_id = restaurant['id']
-    
-    # FIXED: Proper data formatting with validation
+                        logger.info(f"Found restaurant ID: {restaurant_id} for {restaurant_name}")
+                    else:
+                        available_restaurants = [r['name'] for r in restaurants_result['data'][:5]]
+                        return f"❌ Restaurant '{restaurant_name}' not found. Available restaurants: {', '.join(available_restaurants)}"
+            except Exception as e:
+                logger.error(f"Error looking up restaurant: {e}")
+                return f"❌ Error finding restaurant: {str(e)}"
+        
+        if not restaurant_id:
+            return "❌ Could not find restaurant. Please specify a valid restaurant name."
+        
+        # Format reservation data properly
         try:
             reservation_data = {
-            "restaurant_id": str(restaurant_id) if restaurant_id else "",
-            "user_name": str(parameters.get('customer_name', '')),
-            "user_email": str(parameters.get('customer_email', '')),
-            "party_size": int(parameters.get('party_size', 0)),
-            "date": str(parameters.get('reservation_date', '')),
-            "time": str(parameters.get('reservation_time', '')),
-            "special_requests": str(parameters.get('special_requests', ''))
-        }
-        
-        # Validate required fields are not empty
+                "restaurant_id": restaurant_id,  # Use actual UUID
+                "user_name": str(parameters.get('customer_name', '')),
+                "user_email": str(parameters.get('customer_email', '')),
+                "party_size": int(parameters.get('party_size', 0)),
+                "date": str(parameters.get('reservation_date', '')),
+                "time": str(parameters.get('reservation_time', '')),
+                "special_requests": str(parameters.get('special_requests', ''))
+            }
+            
+            # Validate required fields are not empty
             required_fields = ['restaurant_id', 'user_name', 'user_email', 'party_size', 'date', 'time']
             missing_fields = [field for field in required_fields 
                             if not reservation_data.get(field) or reservation_data[field] == "" or reservation_data[field] == 0]
-        
+            
             if missing_fields:
                 error_msg = f"Missing required information: {', '.join(missing_fields)}"
                 logger.error(error_msg)
                 return error_msg
-        
+            
             logger.info(f"Formatted reservation data: {reservation_data}")
-        
-        # Make API call
+            
+            # Make API call with better error handling
             result = self._call_api("reservations", reservation_data, method="POST")
-            logger.info(f"API call result: {result}")
-        
+            logger.info(f"API result: {result}")
+            
             if result and result.get('success'):
                 return "🎉 Reservation confirmed! Your table has been booked successfully."
             else:
                 error_msg = result.get('error', 'Unknown error') if result else 'API connection failed'
                 logger.error(f"Reservation creation failed: {error_msg}")
                 return f"❌ Reservation failed: {error_msg}"
-            
+                
         except Exception as e:
             logger.error(f"Exception during reservation creation: {str(e)}")
             return f"❌ Error creating reservation: {str(e)}"
@@ -420,7 +439,7 @@ class RestaurantAI:
             elif tool_name == "create_reservation":
                 return self._process_tool_create_reservation(parameters)
             
-            elif tool_name == "get_recommendations":  # FIXED: Added this line
+            elif tool_name == "get_recommendations":
                 return self._process_tool_get_recommendations(parameters)
             
             else:
