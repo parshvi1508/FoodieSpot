@@ -318,44 +318,58 @@ class RestaurantAI:
     
     def _process_tool_create_reservation(self, parameters: Dict[str, Any]) -> str:
         """Process reservation creation tool call."""
-        # Debug logging
-        logger.info(f"Creating reservation with parameters: {parameters}")
+        logger.info(f"Raw parameters received: {parameters}")
     
-        # Map parameters to match Flask API expectations exactly
+        # Get restaurant ID by name if needed
+        restaurant_id = parameters.get('restaurant_id')
+        if not restaurant_id:
+            # If no restaurant_id, try to find by name
+            restaurant_name = parameters.get('restaurant_name')
+            if restaurant_name:
+                restaurants_result = self._call_api("restaurants", {}, method="GET")
+                if restaurants_result and restaurants_result.get('data'):
+                    restaurant = next((r for r in restaurants_result['data'] 
+                        if r['name'].lower() == restaurant_name.lower()), None)
+                    if restaurant:
+                        restaurant_id = restaurant['id']
+    
+                    # Ensure all data is properly formatted
         reservation_data = {
-            "restaurant_id": parameters.get('restaurant_id'),
-            "user_name": parameters.get('customer_name'),  # Note: customer_name -> user_name
-            "user_email": parameters.get('customer_email'), # Note: customer_email -> user_email
-            "party_size": parameters.get('party_size'),
-            "date": parameters.get('reservation_date'),     # Note: reservation_date -> date
-            "time": parameters.get('reservation_time'),     # Note: reservation_time -> time
-            "special_requests": parameters.get('special_requests', '')
-        }
-
-        # Validation
+            "restaurant_id": str(restaurant_id) if restaurant_id else None,
+            "user_name": str(parameters.get('customer_name', '')),
+            "user_email": str(parameters.get('customer_email', '')),
+            "party_size": int(parameters.get('party_size', 0)) if parameters.get('party_size') else None,
+            "date": str(parameters.get('reservation_date', '')),  # Ensure string format
+            "time": str(parameters.get('reservation_time', '')),  # Ensure string format
+            "special_requests": str(parameters.get('special_requests', ''))
+    }
+    
+        logger.info(f"Formatted reservation data: {reservation_data}")
+    
+        # Validate required fields
         required_fields = ['restaurant_id', 'user_name', 'user_email', 'party_size', 'date', 'time']
         missing_fields = [field for field in required_fields if not reservation_data.get(field)]
-
-        if missing_fields:
-            return f"Missing required information: {', '.join(missing_fields)}. Please provide all details."
-
-        logger.info(f"Sending reservation data to API: {reservation_data}")
-        result = self._call_api("reservations", reservation_data)
-
-        if result and result.get('success'):
-            reservation = result.get('reservation') or result.get('data')
-        if reservation:
-            return f"🎉 Reservation confirmed!\n" \
-                   f"Reservation ID: {reservation.get('id')}\n" \
-                   f"Restaurant: {reservation.get('restaurant_name', 'Unknown')}\n" \
-                   f"Date: {reservation_data['date']} at {reservation_data['time']}\n" \
-                   f"Party size: {reservation_data['party_size']}\n" \
-                   f"Confirmation email will be sent to {reservation_data['user_email']}"
     
-    # error handling
-        error_msg = result.get('error', 'Unknown error') if result else 'API connection failed'
-        logger.error(f"Reservation creation failed: {error_msg}")
-        return f"❌ Reservation failed: {error_msg}. Please try again or contact support."
+        if missing_fields:
+            error_msg = f"Missing required information: {', '.join(missing_fields)}"
+            logger.error(error_msg)
+            return error_msg
+
+    # Make API call
+        try:
+            result = self._call_api("reservations", reservation_data, method="POST")
+            logger.info(f"API call result: {result}")
+        
+            if result and result.get('success'):
+                return "🎉 Reservation confirmed! Your table has been booked successfully."
+            else:
+                error_msg = result.get('error', 'Unknown error') if result else 'API connection failed'
+                logger.error(f"Reservation creation failed: {error_msg}")
+                return f"❌ Reservation failed: {error_msg}"
+            
+        except Exception as e:
+            logger.error(f"Exception during reservation creation: {str(e)}")
+            return f"❌ Error creating reservation: {str(e)}"
 
     def _process_tool_get_recommendations(self, parameters: Dict[str, Any]) -> str:
         """Process smart recommendations tool call."""
